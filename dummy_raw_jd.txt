@@ -1,0 +1,9 @@
+We are looking for a Senior React dev.
+Needs to know React very well, and typescript. Maybe some NextJS too.
+Should have 5 years experience at least.
+Will be making UI components and fixing bugs. Also mentoring junior devs.
+Must have good communication skills and be a team player.
+Nice to have: Tailwind CSS, Redux, Node.js background.
+Degree in anything related to computers.
+Location: Remote but US hours preferred.
+Salary depends on experience.

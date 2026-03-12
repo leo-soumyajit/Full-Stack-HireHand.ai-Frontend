@@ -1,0 +1,538 @@
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  UserPlus,
+  Users,
+  X,
+  Sparkles,
+  MoreVertical,
+  Eye,
+  Loader2,
+  Trash2,
+  Brain,
+  FileBarChart,
+  Download,
+  ScanSearch,
+  CalendarIcon,
+} from "lucide-react";
+import { ResumeScreeningModal } from "./ResumeScreeningModal";
+import { SchedulingModal } from "./SchedulingModal";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ApiCandidate } from "@/types/api";
+import { useToast } from "@/hooks/use-toast";
+import { psychometricApi } from "@/lib/psychometricApi";
+import { generateFitmentPDF } from "@/lib/generateFitmentPDF";
+
+const STAGES = ["Sourced", "Screened", "Interview L1", "Interview L2", "Offer", "Rejected"];
+
+const STAGE_COLORS: Record<string, string> = {
+  "Sourced": "bg-muted text-muted-foreground border-border/50",
+  "Screened": "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  "Interview L1": "bg-purple-500/15 text-purple-400 border-purple-500/30",
+  "Interview L2": "bg-violet-500/15 text-violet-400 border-violet-500/30",
+  "Offer": "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  "Rejected": "bg-red-500/15 text-red-400 border-red-500/30",
+};
+
+const VERDICT_COLORS: Record<string, string> = {
+  "Go": "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  "Conditional": "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+  "No-Go": "bg-red-500/15 text-red-400 border-red-500/30",
+};
+
+function getInitials(name: string) {
+  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+}
+
+function scoreColor(score: number) {
+  if (score >= 8.0) return "text-emerald-400";
+  if (score >= 7.0) return "text-yellow-400";
+  return "text-red-400";
+}
+
+interface CandidatesTabProps {
+  positionId: string;
+  positionTitle?: string;
+  onAddCandidate: (data: { name: string; role: string; email: string; stage: string }) => Promise<ApiCandidate>;
+  onDeleteCandidate: (candidateId: string) => Promise<void>;
+  getCandidates: (positionId: string) => Promise<ApiCandidate[]>;
+  onScorePsychometric?: (candidateId: string, candidateName: string) => void;
+  onViewReport?: (candidateId: string, candidateName: string) => void;
+  onCandidatesLoaded?: (count: number) => void;
+}
+
+export function CandidatesTab({
+  positionId,
+  positionTitle = "Position",
+  onAddCandidate,
+  onDeleteCandidate,
+  getCandidates,
+  onScorePsychometric,
+  onViewReport,
+  onCandidatesLoaded,
+}: CandidatesTabProps) {
+  const [candidates, setCandidates] = useState<ApiCandidate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [form, setForm] = useState({ name: "", role: "", email: "", stage: "Sourced" });
+  const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
+  const [screenResumeOpen, setScreenResumeOpen] = useState(false);
+  const [schedulingModalOpen, setSchedulingModalOpen] = useState<{ candidateId: string; candidateName: string } | null>(null);
+  const [topN, setTopN] = useState<string>("");
+  const { toast } = useToast();
+
+  const displayCandidates = useMemo(() => {
+    if (!candidates.length) return [];
+    return [...candidates].sort((a, b) => {
+      // Always push manually rejected / No-Go candidates to the bottom
+      const aIsRejected = a.stage === "Rejected" || a.verdict === "No-Go";
+      const bIsRejected = b.stage === "Rejected" || b.verdict === "No-Go";
+      if (aIsRejected && !bIsRejected) return 1;
+      if (!aIsRejected && bIsRejected) return -1;
+      
+      return (b.scores?.composite || 0) - (a.scores?.composite || 0);
+    });
+  }, [candidates]);
+
+  const loadCandidates = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await getCandidates(positionId);
+      setCandidates(data);
+      onCandidatesLoaded?.(data.length);
+    } catch (err) {
+      toast({ title: "Failed to load candidates", description: String(err), variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [positionId, getCandidates, onCandidatesLoaded, toast]);
+
+  useEffect(() => {
+    loadCandidates();
+  }, [loadCandidates]);
+
+  const handleSubmit = async () => {
+    if (!form.name.trim()) return;
+    setIsSaving(true);
+    try {
+      const newCandidate = await onAddCandidate({
+        name: form.name.trim(),
+        role: form.role.trim() || "Not specified",
+        email: form.email.trim(),
+        stage: form.stage,
+      });
+      setCandidates(prev => [newCandidate, ...prev]);
+      setForm({ name: "", role: "", email: "", stage: "Sourced" });
+      setModalOpen(false);
+      toast({ title: "Candidate added!", description: "AI scores auto-generated." });
+    } catch (err) {
+      toast({ title: "Failed to add candidate", description: String(err), variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (candidateId: string) => {
+    if (!window.confirm("Remove this candidate?")) return;
+    setCandidates(prev => prev.filter(c => c.id !== candidateId));
+    try {
+      await onDeleteCandidate(candidateId);
+    } catch (err) {
+      await loadCandidates();
+      toast({ title: "Delete failed", description: String(err), variant: "destructive" });
+    }
+  };
+
+  const handleDownloadPDF = async (candidateId: string, candidateName: string) => {
+    setDownloadingPDF(candidateId);
+    try {
+      const report = await psychometricApi.getReport(candidateId);
+      await generateFitmentPDF(report, candidateName, positionTitle);
+      toast({ title: "PDF Downloaded ✅", description: `${candidateName}'s Fitment Report saved.` });
+    } catch {
+      toast({
+        title: "No Fitment Report Found",
+        description: "Generate a psychometric report for this candidate first.",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingPDF(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-14 gap-3 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span className="text-sm">Loading candidates...</span>
+      </div>
+    );
+  }
+
+  if (candidates.length === 0 && !modalOpen) {
+    return (
+      <>
+        <Card className="glass-strong">
+          <CardContent className="p-12 text-center">
+            <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-muted mb-4">
+              <Users className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <p className="text-lg font-semibold text-foreground font-display">No Candidates Yet</p>
+            <p className="text-sm text-muted-foreground mt-1 mb-5">Screen resumes with AI or add manually.</p>
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <Button
+                onClick={() => setScreenResumeOpen(true)}
+                variant="outline"
+                className="border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+              >
+                <ScanSearch className="h-4 w-4 mr-1.5" /> Screen Resume with AI
+              </Button>
+              <Button onClick={() => setModalOpen(true)} className="gradient-primary text-primary-foreground font-semibold">
+                <UserPlus className="h-4 w-4 mr-1" /> Add Candidate
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        <AddCandidateModal
+          open={modalOpen}
+          form={form}
+          setForm={setForm}
+          onSubmit={handleSubmit}
+          onClose={() => setModalOpen(false)}
+          isSaving={isSaving}
+        />
+        <ResumeScreeningModal
+          open={screenResumeOpen}
+          onClose={() => setScreenResumeOpen(false)}
+          positionId={positionId}
+          positionTitle={positionTitle}
+          onCandidateAdded={() => loadCandidates()}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground whitespace-nowrap">
+            Showing <span className="text-foreground font-medium">{candidates.length}</span> candidates
+          </p>
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-lg border border-border/40">
+              <Brain className="h-4 w-4 text-primary" />
+              <Label htmlFor="top-n" className="text-xs font-medium text-muted-foreground whitespace-nowrap">AI Top:</Label>
+              <Input
+                id="top-n"
+                type="number"
+                min="1"
+                max={candidates.length.toString()}
+                placeholder="All"
+                value={topN}
+                onChange={(e) => setTopN(e.target.value)}
+                className="w-16 h-7 text-xs px-2 text-center bg-background border-border"
+              />
+            </div>
+            
+            <Button
+              onClick={() => setScreenResumeOpen(true)}
+              size="sm"
+              variant="outline"
+              className="border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+            >
+              <ScanSearch className="h-4 w-4 mr-1.5" /> Screen Resume with AI
+            </Button>
+            <Button onClick={() => setModalOpen(true)} size="sm" className="gradient-primary text-primary-foreground font-semibold">
+              <UserPlus className="h-4 w-4 mr-1" /> Add Candidate
+            </Button>
+          </div>
+        </div>
+
+        <Card className="glass-strong overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border/30 hover:bg-transparent">
+                <TableHead className="text-muted-foreground font-medium">Candidate</TableHead>
+                <TableHead className="text-muted-foreground font-medium">Current Stage</TableHead>
+                <TableHead className="text-muted-foreground font-medium text-center">Resume/JD</TableHead>
+                <TableHead className="text-muted-foreground font-medium text-center hidden sm:table-cell">Psychometric</TableHead>
+                <TableHead className="text-muted-foreground font-medium text-center hidden md:table-cell">Composite</TableHead>
+                <TableHead className="text-muted-foreground font-medium hidden lg:table-cell">Verdict</TableHead>
+                <TableHead className="text-muted-foreground font-medium w-12">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(() => {
+                let rankedIndex = 0;
+                return displayCandidates.map((c) => {
+                  const limit = parseInt(topN, 10);
+                  const isManuallyRejected = c.stage === "Rejected" || c.verdict === "No-Go";
+                  
+                  // Only count against Top N if not manually rejected
+                  const isRejectedByAI = !isManuallyRejected && !isNaN(limit) && limit > 0 && rankedIndex >= limit;
+                  if (!isManuallyRejected) rankedIndex++;
+                  
+                  const isDisplayRejected = isManuallyRejected || isRejectedByAI;
+                  const displayStage = isRejectedByAI ? "Rejected" : c.stage;
+                  const displayVerdict = isRejectedByAI ? "No-Go" : c.verdict;
+                  
+                  return (
+                    <TableRow key={c.id} className={`border-border/20 transition-all duration-300 ${isDisplayRejected ? 'opacity-40 hover:opacity-100 bg-red-950/5 grayscale hover:grayscale-0' : 'hover:bg-primary/5'}`}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-9 w-9 shrink-0">
+                        <AvatarFallback className="bg-primary/15 text-primary text-xs font-semibold">
+                          {getInitials(c.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{c.role}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={`text-xs ${isRejectedByAI ? 'bg-red-500/10 text-red-500 border-red-500/20' : (STAGE_COLORS[displayStage] || STAGE_COLORS["Sourced"])}`}>
+                      {isRejectedByAI ? 'AI Rejected' : displayStage}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className={`text-sm font-semibold ${scoreColor(c.scores.resume)}`}>
+                      {c.scores.resume.toFixed(1)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center hidden sm:table-cell">
+                    <span className={`text-sm font-semibold ${scoreColor(c.scores.psych)}`}>
+                      {c.scores.psych.toFixed(1)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center hidden md:table-cell">
+                    <span className={`text-sm font-bold ${c.scores.composite >= 85 ? "text-emerald-400" : c.scores.composite >= 70 ? "text-yellow-400" : "text-red-400"}`}>
+                      {c.scores.composite}%
+                    </span>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <Badge variant="outline" className={`text-xs ${isRejectedByAI ? VERDICT_COLORS["No-Go"] : (VERDICT_COLORS[displayVerdict] || VERDICT_COLORS["Conditional"])}`}>
+                      {displayVerdict}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                          <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-card border-border/50 z-50 w-52">
+                        <DropdownMenuItem
+                          onClick={() => onScorePsychometric?.(c.id, c.name)}
+                          className="gap-2 cursor-pointer"
+                        >
+                          <Brain className="h-4 w-4 text-primary" />
+                          <span>Score Psychometric</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onViewReport?.(c.id, c.name)}
+                          className="gap-2 cursor-pointer"
+                        >
+                          <FileBarChart className="h-4 w-4 text-emerald-400" />
+                          <span>View Fitment Report</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setSchedulingModalOpen({ candidateId: c.id, candidateName: c.name })}
+                          className="gap-2 cursor-pointer"
+                        >
+                          <CalendarIcon className="h-4 w-4 text-indigo-400" />
+                          <span>Schedule Interview</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDownloadPDF(c.id, c.name)}
+                          disabled={downloadingPDF === c.id}
+                          className="gap-2 cursor-pointer"
+                        >
+                          {downloadingPDF === c.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+                          ) : (
+                            <Download className="h-4 w-4 text-blue-400" />
+                          )}
+                          <span>{downloadingPDF === c.id ? "Generating PDF..." : "Download PDF Report"}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-border/40" />
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(c.id)}
+                          className="text-red-400 focus:text-red-400 focus:bg-red-500/10 gap-2 cursor-pointer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span>Remove</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                  </TableRow>
+                  );
+                });
+              })()}
+            </TableBody>
+          </Table>
+        </Card>
+      </div>
+
+      <AddCandidateModal
+        open={modalOpen}
+        form={form}
+        setForm={setForm}
+        onSubmit={handleSubmit}
+        onClose={() => setModalOpen(false)}
+        isSaving={isSaving}
+      />
+      <ResumeScreeningModal
+        open={screenResumeOpen}
+        onClose={() => setScreenResumeOpen(false)}
+        positionId={positionId}
+        positionTitle={positionTitle}
+        onCandidateAdded={() => loadCandidates()}
+      />
+      {schedulingModalOpen && (
+        <SchedulingModal
+          open={!!schedulingModalOpen}
+          onClose={() => setSchedulingModalOpen(null)}
+          candidateId={schedulingModalOpen.candidateId}
+          candidateName={schedulingModalOpen.candidateName}
+          positionId={positionId}
+          onScheduled={() => loadCandidates()}
+        />
+      )}
+    </>
+  );
+}
+
+interface ModalProps {
+  open: boolean;
+  form: { name: string; role: string; email: string; stage: string };
+  setForm: React.Dispatch<React.SetStateAction<{ name: string; role: string; email: string; stage: string }>>;
+  onSubmit: () => void;
+  onClose: () => void;
+  isSaving: boolean;
+}
+
+function AddCandidateModal({ open, form, setForm, onSubmit, onClose, isSaving }: ModalProps) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        >
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.2 }}
+            className="relative w-full max-w-md bg-card border border-border/40 rounded-2xl shadow-2xl glow-sm overflow-hidden"
+          >
+            <div className="flex items-center justify-between p-6 border-b border-border/30">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-primary">
+                  <UserPlus className="h-5 w-5 text-primary-foreground" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-foreground font-display">Add Candidate</h3>
+                  <p className="text-xs text-muted-foreground">AI will auto-generate scores</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Full Name</Label>
+                <Input
+                  placeholder="e.g. Priya Sharma"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className="bg-background/50 border-border/50 focus:border-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Current Role / Company</Label>
+                <Input
+                  placeholder="e.g. Staff Engineer @ InnovateTech"
+                  value={form.role}
+                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                  className="bg-background/50 border-border/50 focus:border-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Email</Label>
+                <Input
+                  type="email"
+                  placeholder="e.g. priya@innovatetech.com"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  className="bg-background/50 border-border/50 focus:border-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Stage</Label>
+                <Select value={form.stage} onValueChange={(v) => setForm((f) => ({ ...f, stage: v }))}>
+                  <SelectTrigger className="bg-background/50 border-border/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-border/50 z-50">
+                    {STAGES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-border/30">
+              <Button variant="ghost" onClick={onClose}>Cancel</Button>
+              <Button
+                onClick={onSubmit}
+                disabled={!form.name.trim() || isSaving}
+                className="gradient-primary text-primary-foreground font-semibold rounded-lg hover:opacity-90"
+              >
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                {isSaving ? "Saving..." : "Add & Generate Scores"}
+              </Button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
