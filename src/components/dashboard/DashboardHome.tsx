@@ -24,6 +24,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MainLoader } from "@/components/ui/main-loader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -214,7 +215,7 @@ export function DashboardHome({ onViewPosition }: DashboardHomeProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {kpiData.map((kpi) => (
             <motion.div key={kpi.label} variants={item}>
-              <Card className="glass-strong hover:glow-sm transition-all duration-300 group">
+              <Card className="glass-card group">
                 <CardContent className="p-5 flex items-start gap-4">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl gradient-primary">
                     <kpi.icon className="h-5 w-5 text-primary-foreground" />
@@ -244,7 +245,7 @@ export function DashboardHome({ onViewPosition }: DashboardHomeProps) {
               { label: "View Analytics", icon: BarChart3, desc: "Hiring insights", action: undefined },
               { label: "Decision Packs", icon: Package, desc: "Review bundles", action: undefined },
             ].map((qa) => (
-              <Card key={qa.label} onClick={qa.action} className="glass hover:glow-sm transition-all duration-300 cursor-pointer group">
+              <Card key={qa.label} onClick={qa.action} className="glass-card cursor-pointer group">
                 <CardContent className="p-5 flex items-center gap-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                     <qa.icon className="h-5 w-5 text-primary" />
@@ -278,26 +279,25 @@ export function DashboardHome({ onViewPosition }: DashboardHomeProps) {
               </button>
             </div>
           </div>
-          <Card className="glass-strong overflow-hidden">
+          <Card className="glass-card overflow-hidden">
             {isLoading ? (
-              <div className="flex items-center justify-center py-14 gap-3 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span className="text-sm">Loading positions...</span>
+              <div className="py-14">
+                <MainLoader text="Loading positions..." />
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow className="border-border/30 hover:bg-transparent">
-                    <TableHead className="text-muted-foreground font-medium">Req ID</TableHead>
-                    <TableHead className="text-muted-foreground font-medium">Role</TableHead>
-                    <TableHead className="text-muted-foreground font-medium hidden md:table-cell">BU</TableHead>
-                    <TableHead className="text-muted-foreground font-medium hidden lg:table-cell">Location</TableHead>
-                    <TableHead className="text-muted-foreground font-medium text-center">Candidates</TableHead>
-                    <TableHead className="text-muted-foreground font-medium text-center hidden sm:table-cell">Shortlisted</TableHead>
-                    <TableHead className="text-muted-foreground font-medium hidden md:table-cell">Risk Flags</TableHead>
-                    <TableHead className="text-muted-foreground font-medium">Status</TableHead>
-                    <TableHead className="text-muted-foreground font-medium hidden lg:table-cell">Updated</TableHead>
-                    <TableHead className="text-muted-foreground font-medium w-12">Actions</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Req ID</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Role</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground hidden md:table-cell">BU</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground hidden lg:table-cell">Location</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-center">Candidates</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-center hidden sm:table-cell">Shortlisted</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground hidden md:table-cell">Risk Flags</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Status</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground hidden lg:table-cell">Updated</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground w-12">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { MainLoader } from "@/components/ui/main-loader";
 import { usePositions } from "@/hooks/usePositions";
 import { ApiCandidate } from "@/types/api";
 
@@ -96,9 +97,8 @@ export function AllCandidatesView() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20 gap-3 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span>Loading candidates...</span>
+      <div className="py-20">
+        <MainLoader text="Loading candidates..." />
       </div>
     );
   }

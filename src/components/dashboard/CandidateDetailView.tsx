@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { MainLoader } from "@/components/ui/main-loader";
 import { ApiCandidate } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
@@ -124,9 +125,8 @@ export function CandidateDetailView({ candidateId, positionId, onBack }: Props) 
       {/* Content Area */}
       <ScrollArea className="flex-1 pb-10">
         {isLoading || !candidate ? (
-          <div className="h-64 flex flex-col items-center justify-center gap-4 text-muted-foreground">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p>Retrieving full AI analysis profile...</p>
+          <div className="h-64 flex flex-col items-center justify-center">
+            <MainLoader text="Retrieving full AI analysis profile..." />
           </div>
         ) : (
           <div className="space-y-8 max-w-5xl mx-auto">

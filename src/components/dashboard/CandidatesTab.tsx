@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { MainLoader } from "@/components/ui/main-loader";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
@@ -322,9 +323,8 @@ export function CandidatesTab({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-14 gap-3 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="text-sm">Loading candidates...</span>
+      <div className="py-14">
+        <MainLoader text="Loading candidates..." />
       </div>
     );
   }
@@ -427,17 +427,17 @@ export function CandidatesTab({
                 Send Shortlist Mail
               </Button>
             </div>
-            <Card className="glass-strong overflow-hidden">
+            <Card className="glass-card overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border/30 hover:bg-transparent">
-                    <TableHead className="text-muted-foreground font-medium">Candidate</TableHead>
-                    <TableHead className="text-muted-foreground font-medium">Stage</TableHead>
-                    <TableHead className="text-muted-foreground font-medium text-center">Resume</TableHead>
-                    <TableHead className="text-muted-foreground font-medium text-center hidden sm:table-cell">Psych</TableHead>
-                    <TableHead className="text-muted-foreground font-medium text-center hidden md:table-cell">Composite</TableHead>
-                    <TableHead className="text-muted-foreground font-medium hidden lg:table-cell">Verdict</TableHead>
-                    <TableHead className="text-muted-foreground font-medium w-12">Actions</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Candidate</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Stage</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-center">Resume</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-center hidden sm:table-cell">Psych</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-center hidden md:table-cell">Composite</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground hidden lg:table-cell">Verdict</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground w-12">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -466,17 +466,17 @@ export function CandidatesTab({
                 Send Rejection Mail
               </Button>
             </div>
-            <Card className="glass-strong overflow-hidden opacity-90">
+            <Card className="glass-card overflow-hidden opacity-90">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border/30 hover:bg-transparent">
-                    <TableHead className="text-muted-foreground font-medium">Candidate</TableHead>
-                    <TableHead className="text-muted-foreground font-medium">Stage</TableHead>
-                    <TableHead className="text-muted-foreground font-medium text-center">Resume</TableHead>
-                    <TableHead className="text-muted-foreground font-medium text-center hidden sm:table-cell">Psych</TableHead>
-                    <TableHead className="text-muted-foreground font-medium text-center hidden md:table-cell">Composite</TableHead>
-                    <TableHead className="text-muted-foreground font-medium hidden lg:table-cell">Verdict</TableHead>
-                    <TableHead className="text-muted-foreground font-medium w-12">Actions</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Candidate</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">Stage</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-center">Resume</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-center hidden sm:table-cell">Psych</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground text-center hidden md:table-cell">Composite</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground hidden lg:table-cell">Verdict</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground w-12">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

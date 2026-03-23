@@ -31,6 +31,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { MainLoader } from "@/components/ui/main-loader";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiPosition, ApiPositionJD } from "@/types/api";
 import { usePositions } from "@/hooks/usePositions";
@@ -121,9 +122,8 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
 
   if (isLoading && !position) {
     return (
-      <div className="flex items-center justify-center py-20 gap-3 text-muted-foreground">
-        <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-        <span className="text-sm">Loading position...</span>
+      <div className="py-20">
+        <MainLoader text="Loading position..." />
       </div>
     );
   }
@@ -177,15 +177,15 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+      <div className="flex gap-1.5 overflow-x-auto p-1.5 bg-muted/30 rounded-xl border border-border/40 scrollbar-hide w-full max-w-full lg:w-fit">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-all duration-200 ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm whitespace-nowrap transition-all duration-300 ${
               activeTab === tab.id
-                ? "bg-primary/15 text-primary glow-sm font-medium"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "bg-background border border-border/60 shadow-sm text-foreground font-semibold"
+                : "text-muted-foreground hover:bg-muted/80 hover:text-foreground font-medium"
             }`}
           >
             <tab.icon className="h-4 w-4" />
@@ -240,7 +240,7 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
         />
       )}
       {!["overview", "jd", "candidates", "l1-questions", "psychometrics"].includes(activeTab) && (
-        <Card className="glass-strong">
+        <Card className="glass-card">
           <CardContent className="p-12 text-center">
             <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-muted mb-4">
               {TABS.find((t) => t.id === activeTab)?.icon &&
