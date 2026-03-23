@@ -93,6 +93,12 @@ export const positionsApi = {
       body: JSON.stringify({ jd, version }),
     }),
 
+  saveL1Questions: (id: string, questions: import('@/types/api').ApiL1Question[]) =>
+    apiFetch<import('@/types/api').ApiPosition>(`/api/positions/${id}/l1-questions`, {
+      method: 'PUT',
+      body: JSON.stringify({ questions }),
+    }),
+
   delete: (id: string) =>
     apiFetch<void>(`/api/positions/${id}`, { method: 'DELETE' }),
 };

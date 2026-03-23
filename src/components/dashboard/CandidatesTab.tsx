@@ -14,6 +14,8 @@ import {
   Download,
   ScanSearch,
   CalendarIcon,
+  Mail,
+  Send,
 } from "lucide-react";
 import { ResumeScreeningModal } from "./ResumeScreeningModal";
 import { SchedulingModal } from "./SchedulingModal";
@@ -49,6 +51,7 @@ import { ApiCandidate } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
 import { psychometricApi } from "@/lib/psychometricApi";
 import { generateFitmentPDF } from "@/lib/generateFitmentPDF";
+import { emailApi } from "@/lib/emailApi";
 
 const STAGES = ["Sourced", "Screened", "Interview L1", "Interview L2", "Offer", "Rejected"];
 
@@ -86,6 +89,7 @@ interface CandidatesTabProps {
   onScorePsychometric?: (candidateId: string, candidateName: string) => void;
   onViewReport?: (candidateId: string, candidateName: string) => void;
   onCandidatesLoaded?: (count: number) => void;
+  onViewCandidate?: (id: string) => void;
 }
 
 export function CandidatesTab({
@@ -96,6 +100,7 @@ export function CandidatesTab({
   getCandidates,
   onScorePsychometric,
   onViewReport,
+  onViewCandidate,
   onCandidatesLoaded,
 }: CandidatesTabProps) {
   const [candidates, setCandidates] = useState<ApiCandidate[]>([]);
@@ -107,6 +112,7 @@ export function CandidatesTab({
   const [screenResumeOpen, setScreenResumeOpen] = useState(false);
   const [schedulingModalOpen, setSchedulingModalOpen] = useState<{ candidateId: string; candidateName: string } | null>(null);
   const [topN, setTopN] = useState<string>("");
+  const [isSendingMail, setIsSendingMail] = useState<string | false>(false);
   const { toast } = useToast();
 
   const displayCandidates = useMemo(() => {
@@ -121,6 +127,30 @@ export function CandidatesTab({
       return (b.scores?.composite || 0) - (a.scores?.composite || 0);
     });
   }, [candidates]);
+
+  const { shortlistedList, rejectedList } = useMemo(() => {
+    const shortlisted: ApiCandidate[] = [];
+    const rejected: ApiCandidate[] = [];
+    
+    let rankedIndex = 0;
+    const limit = parseInt(topN, 10);
+    const hasLimit = !isNaN(limit) && limit > 0;
+
+    displayCandidates.forEach((c) => {
+      const isManuallyRejected = c.stage === "Rejected" || c.verdict === "No-Go";
+      const isRejectedByAI = !isManuallyRejected && hasLimit && rankedIndex >= limit;
+
+      if (!isManuallyRejected) rankedIndex++;
+
+      if (isManuallyRejected || isRejectedByAI) {
+        rejected.push(c);
+      } else {
+        shortlisted.push(c);
+      }
+    });
+
+    return { shortlistedList: shortlisted, rejectedList: rejected };
+  }, [displayCandidates, topN]);
 
   const loadCandidates = useCallback(async () => {
     setIsLoading(true);
@@ -138,6 +168,27 @@ export function CandidatesTab({
   useEffect(() => {
     loadCandidates();
   }, [loadCandidates]);
+
+  const handleSendBulkMail = async (type: 'shortlist' | 'reject') => {
+    const ids = type === 'shortlist' 
+      ? shortlistedList.map(c => c.id)
+      : rejectedList.map(c => c.id);
+
+    if (ids.length === 0) {
+      toast({ title: "No candidates", description: "No candidates in this section to email.", variant: "destructive" });
+      return;
+    }
+
+    setIsSendingMail(type);
+    try {
+      const res = await emailApi.sendBulkMails(positionId, ids, type);
+      toast({ title: "Emails Sent!", description: `Successfully dispatched ${res.sent_count} emails.` });
+    } catch (err: any) {
+      toast({ title: "Failed to send emails", description: err.message || String(err), variant: "destructive" });
+    } finally {
+      setIsSendingMail(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!form.name.trim()) return;
@@ -186,6 +237,87 @@ export function CandidatesTab({
     } finally {
       setDownloadingPDF(null);
     }
+  };
+
+  const renderCandidateRow = (c: ApiCandidate, isRejectedList: boolean) => {
+    const isManuallyRejected = c.stage === "Rejected" || c.verdict === "No-Go";
+    const displayStage = isRejectedList && !isManuallyRejected ? "Rejected" : c.stage;
+    const displayVerdict = isRejectedList && !isManuallyRejected ? "No-Go" : c.verdict;
+    
+    return (
+      <TableRow 
+        key={c.id} 
+        onClick={() => onViewCandidate(c.id)}
+        className={`border-border/20 transition-all cursor-pointer duration-300 ${isRejectedList ? 'hover:bg-red-950/20 grayscale hover:grayscale-0' : 'hover:bg-primary/5'}`}
+      >
+        <TableCell>
+          <div className="flex items-center gap-3">
+            <Avatar className="h-9 w-9 shrink-0">
+              <AvatarFallback className="bg-primary/15 text-primary text-xs font-semibold">
+                {getInitials(c.name)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+              <p className="text-xs text-muted-foreground truncate">{c.role}</p>
+            </div>
+          </div>
+        </TableCell>
+        <TableCell>
+          <Badge variant="outline" className={`text-xs ${isRejectedList && !isManuallyRejected ? 'bg-red-500/10 text-red-500 border-red-500/20' : (STAGE_COLORS[displayStage] || STAGE_COLORS["Sourced"])}`}>
+            {isRejectedList && !isManuallyRejected ? 'AI Rejected' : displayStage}
+          </Badge>
+        </TableCell>
+        <TableCell className="text-center">
+          <span className={`text-sm font-semibold ${scoreColor(c.scores?.resume || 0)}`}>
+            {(c.scores?.resume || 0).toFixed(1)}
+          </span>
+        </TableCell>
+        <TableCell className="text-center hidden sm:table-cell">
+          <span className={`text-sm font-semibold ${scoreColor(c.scores?.psych || 0)}`}>
+            {(c.scores?.psych || 0).toFixed(1)}
+          </span>
+        </TableCell>
+        <TableCell className="text-center hidden md:table-cell">
+          <span className={`text-sm font-bold ${c.scores?.composite >= 85 ? "text-emerald-400" : c.scores?.composite >= 70 ? "text-yellow-400" : "text-red-400"}`}>
+            {c.scores?.composite || 0}%
+          </span>
+        </TableCell>
+        <TableCell className="hidden lg:table-cell">
+          <Badge variant="outline" className={`text-xs ${isRejectedList && !isManuallyRejected ? VERDICT_COLORS["No-Go"] : (VERDICT_COLORS[displayVerdict] || VERDICT_COLORS["Conditional"])}`}>
+            {displayVerdict}
+          </Badge>
+        </TableCell>
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                <MoreVertical className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-card border-border/50 z-50 w-52">
+              <DropdownMenuItem onClick={() => onScorePsychometric?.(c.id, c.name)} className="gap-2 cursor-pointer">
+                <Brain className="h-4 w-4 text-primary" /><span>Score Psychometric</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onViewReport?.(c.id, c.name)} className="gap-2 cursor-pointer">
+                <FileBarChart className="h-4 w-4 text-emerald-400" /><span>View Fitment Report</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSchedulingModalOpen({ candidateId: c.id, candidateName: c.name })} className="gap-2 cursor-pointer">
+                <CalendarIcon className="h-4 w-4 text-indigo-400" /><span>Schedule Interview</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDownloadPDF(c.id, c.name)} disabled={downloadingPDF === c.id} className="gap-2 cursor-pointer">
+                {downloadingPDF === c.id ? <Loader2 className="h-4 w-4 animate-spin text-blue-400" /> : <Download className="h-4 w-4 text-blue-400" />}
+                <span>{downloadingPDF === c.id ? "Generating PDF..." : "Download PDF Report"}</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-border/40" />
+              <DropdownMenuItem onClick={() => handleDelete(c.id)} className="text-red-400 focus:text-red-400 focus:bg-red-500/10 gap-2 cursor-pointer">
+                <Trash2 className="h-4 w-4" /><span>Remove</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
+    );
   };
 
   if (isLoading) {
@@ -277,133 +409,83 @@ export function CandidatesTab({
           </div>
         </div>
 
-        <Card className="glass-strong overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border/30 hover:bg-transparent">
-                <TableHead className="text-muted-foreground font-medium">Candidate</TableHead>
-                <TableHead className="text-muted-foreground font-medium">Current Stage</TableHead>
-                <TableHead className="text-muted-foreground font-medium text-center">Resume/JD</TableHead>
-                <TableHead className="text-muted-foreground font-medium text-center hidden sm:table-cell">Psychometric</TableHead>
-                <TableHead className="text-muted-foreground font-medium text-center hidden md:table-cell">Composite</TableHead>
-                <TableHead className="text-muted-foreground font-medium hidden lg:table-cell">Verdict</TableHead>
-                <TableHead className="text-muted-foreground font-medium w-12">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(() => {
-                let rankedIndex = 0;
-                return displayCandidates.map((c) => {
-                  const limit = parseInt(topN, 10);
-                  const isManuallyRejected = c.stage === "Rejected" || c.verdict === "No-Go";
-                  
-                  // Only count against Top N if not manually rejected
-                  const isRejectedByAI = !isManuallyRejected && !isNaN(limit) && limit > 0 && rankedIndex >= limit;
-                  if (!isManuallyRejected) rankedIndex++;
-                  
-                  const isDisplayRejected = isManuallyRejected || isRejectedByAI;
-                  const displayStage = isRejectedByAI ? "Rejected" : c.stage;
-                  const displayVerdict = isRejectedByAI ? "No-Go" : c.verdict;
-                  
-                  return (
-                    <TableRow key={c.id} className={`border-border/20 transition-all duration-300 ${isDisplayRejected ? 'opacity-40 hover:opacity-100 bg-red-950/5 grayscale hover:grayscale-0' : 'hover:bg-primary/5'}`}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-9 w-9 shrink-0">
-                        <AvatarFallback className="bg-primary/15 text-primary text-xs font-semibold">
-                          {getInitials(c.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{c.role}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={`text-xs ${isRejectedByAI ? 'bg-red-500/10 text-red-500 border-red-500/20' : (STAGE_COLORS[displayStage] || STAGE_COLORS["Sourced"])}`}>
-                      {isRejectedByAI ? 'AI Rejected' : displayStage}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span className={`text-sm font-semibold ${scoreColor(c.scores.resume)}`}>
-                      {c.scores.resume.toFixed(1)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center hidden sm:table-cell">
-                    <span className={`text-sm font-semibold ${scoreColor(c.scores.psych)}`}>
-                      {c.scores.psych.toFixed(1)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center hidden md:table-cell">
-                    <span className={`text-sm font-bold ${c.scores.composite >= 85 ? "text-emerald-400" : c.scores.composite >= 70 ? "text-yellow-400" : "text-red-400"}`}>
-                      {c.scores.composite}%
-                    </span>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <Badge variant="outline" className={`text-xs ${isRejectedByAI ? VERDICT_COLORS["No-Go"] : (VERDICT_COLORS[displayVerdict] || VERDICT_COLORS["Conditional"])}`}>
-                      {displayVerdict}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                          <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-card border-border/50 z-50 w-52">
-                        <DropdownMenuItem
-                          onClick={() => onScorePsychometric?.(c.id, c.name)}
-                          className="gap-2 cursor-pointer"
-                        >
-                          <Brain className="h-4 w-4 text-primary" />
-                          <span>Score Psychometric</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => onViewReport?.(c.id, c.name)}
-                          className="gap-2 cursor-pointer"
-                        >
-                          <FileBarChart className="h-4 w-4 text-emerald-400" />
-                          <span>View Fitment Report</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setSchedulingModalOpen({ candidateId: c.id, candidateName: c.name })}
-                          className="gap-2 cursor-pointer"
-                        >
-                          <CalendarIcon className="h-4 w-4 text-indigo-400" />
-                          <span>Schedule Interview</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDownloadPDF(c.id, c.name)}
-                          disabled={downloadingPDF === c.id}
-                          className="gap-2 cursor-pointer"
-                        >
-                          {downloadingPDF === c.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
-                          ) : (
-                            <Download className="h-4 w-4 text-blue-400" />
-                          )}
-                          <span>{downloadingPDF === c.id ? "Generating PDF..." : "Download PDF Report"}</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-border/40" />
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(c.id)}
-                          className="text-red-400 focus:text-red-400 focus:bg-red-500/10 gap-2 cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span>Remove</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+        {shortlistedList.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between mt-2">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-emerald-500" />
+                Shortlisted Candidates ({shortlistedList.length})
+              </h3>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="font-semibold gap-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                disabled={isSendingMail === 'shortlist'}
+                onClick={() => handleSendBulkMail('shortlist')}
+              >
+                {isSendingMail === 'shortlist' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Send Shortlist Mail
+              </Button>
+            </div>
+            <Card className="glass-strong overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border/30 hover:bg-transparent">
+                    <TableHead className="text-muted-foreground font-medium">Candidate</TableHead>
+                    <TableHead className="text-muted-foreground font-medium">Stage</TableHead>
+                    <TableHead className="text-muted-foreground font-medium text-center">Resume</TableHead>
+                    <TableHead className="text-muted-foreground font-medium text-center hidden sm:table-cell">Psych</TableHead>
+                    <TableHead className="text-muted-foreground font-medium text-center hidden md:table-cell">Composite</TableHead>
+                    <TableHead className="text-muted-foreground font-medium hidden lg:table-cell">Verdict</TableHead>
+                    <TableHead className="text-muted-foreground font-medium w-12">Actions</TableHead>
                   </TableRow>
-                  );
-                });
-              })()}
-            </TableBody>
-          </Table>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {shortlistedList.map(c => renderCandidateRow(c, false))}
+                </TableBody>
+              </Table>
+            </Card>
+          </div>
+        )}
+
+        {rejectedList.length > 0 && (
+          <div className="space-y-3 pt-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Trash2 className="h-5 w-5 text-red-500" />
+                Unselected / Rejected ({rejectedList.length})
+              </h3>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="font-semibold gap-1.5 bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                disabled={isSendingMail === 'reject'}
+                onClick={() => handleSendBulkMail('reject')}
+              >
+                {isSendingMail === 'reject' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Send Rejection Mail
+              </Button>
+            </div>
+            <Card className="glass-strong overflow-hidden opacity-90">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border/30 hover:bg-transparent">
+                    <TableHead className="text-muted-foreground font-medium">Candidate</TableHead>
+                    <TableHead className="text-muted-foreground font-medium">Stage</TableHead>
+                    <TableHead className="text-muted-foreground font-medium text-center">Resume</TableHead>
+                    <TableHead className="text-muted-foreground font-medium text-center hidden sm:table-cell">Psych</TableHead>
+                    <TableHead className="text-muted-foreground font-medium text-center hidden md:table-cell">Composite</TableHead>
+                    <TableHead className="text-muted-foreground font-medium hidden lg:table-cell">Verdict</TableHead>
+                    <TableHead className="text-muted-foreground font-medium w-12">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rejectedList.map(c => renderCandidateRow(c, true))}
+                </TableBody>
+              </Table>
+            </Card>
+          </div>
+        )}
       </div>
 
       <AddCandidateModal
@@ -419,7 +501,11 @@ export function CandidatesTab({
         onClose={() => setScreenResumeOpen(false)}
         positionId={positionId}
         positionTitle={positionTitle}
-        onCandidateAdded={() => loadCandidates()}
+        onCandidateAdded={(id) => {
+          loadCandidates();
+          setScreenResumeOpen(false);
+          if (onViewCandidate) onViewCandidate(id);
+        }}
       />
       {schedulingModalOpen && (
         <SchedulingModal

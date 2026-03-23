@@ -329,118 +329,16 @@ export function ResumeScreeningModal({
                 </motion.div>
               )}
 
-              {/* Analysis Result */}
+              {/* Summary */}
               {analysis && verdictCfg && !analyzing && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4"
-                >
-                  {/* Candidate Info */}
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/30 border border-border/30">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15 shrink-0">
-                      <User className="h-6 w-6 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-foreground text-base">{analysis.candidate_name}</p>
-                      {analysis.candidate_current_role && (
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <Briefcase className="h-3 w-3 text-muted-foreground shrink-0" />
-                          <p className="text-xs text-muted-foreground truncate">{analysis.candidate_current_role}</p>
-                        </div>
-                      )}
-                      {analysis.candidate_email && (
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <Mail className="h-3 w-3 text-muted-foreground shrink-0" />
-                          <p className="text-xs text-muted-foreground truncate">{analysis.candidate_email}</p>
-                        </div>
-                      )}
-                    </div>
-                    {result?.candidateId && (
-                      <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shrink-0 text-xs">
-                        ✓ Added
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Verdict + Scores */}
-                  <div className={`flex items-center gap-4 p-5 rounded-2xl border shadow-lg ${verdictCfg.bg} ${verdictCfg.glow}`}>
-                    <ScoreRing score={analysis.resume_score} size={76} />
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <verdictCfg.icon className={`h-5 w-5 shrink-0 ${verdictCfg.color}`} />
-                        <p className={`text-lg font-black font-display ${verdictCfg.color}`}>
-                          {analysis.verdict}
-                        </p>
-                        <Badge variant="outline" className="text-xs border-border/40 text-muted-foreground">
-                          {analysis.recommended_stage}
-                        </Badge>
-                      </div>
-                      <MatchBar percent={analysis.jd_match_percent} />
-                    </div>
-                  </div>
-
-                  {/* Summary */}
-                  <div className="p-4 rounded-xl bg-muted/20 border border-border/20">
-                    <p className="text-xs font-medium text-primary mb-1.5 flex items-center gap-1.5">
-                      <Target className="h-3.5 w-3.5" /> Experience Summary
-                    </p>
-                    <p className="text-sm text-foreground leading-relaxed">{analysis.experience_summary}</p>
-                  </div>
-
-                  {/* Strengths + Gaps */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <Card className="glass-strong">
-                      <CardContent className="p-4">
-                        <p className="text-xs font-semibold text-emerald-400 mb-3 flex items-center gap-1.5">
-                          <TrendingUp className="h-3.5 w-3.5" /> Strengths
-                        </p>
-                        <ul className="space-y-2">
-                          {analysis.strengths.map((s, i) => (
-                            <li key={i} className="flex items-start gap-2">
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mt-0.5 shrink-0" />
-                              <span className="text-xs text-muted-foreground leading-snug">{s}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                    <Card className="glass-strong">
-                      <CardContent className="p-4">
-                        <p className="text-xs font-semibold text-red-400 mb-3 flex items-center gap-1.5">
-                          <AlertTriangle className="h-3.5 w-3.5" /> Gaps vs JD
-                        </p>
-                        <ul className="space-y-2">
-                          {analysis.gaps.length > 0 ? analysis.gaps.map((g, i) => (
-                            <li key={i} className="flex items-start gap-2">
-                              <XCircle className="h-3.5 w-3.5 text-red-400 mt-0.5 shrink-0" />
-                              <span className="text-xs text-muted-foreground leading-snug">{g}</span>
-                            </li>
-                          )) : (
-                            <li className="text-xs text-emerald-400">No significant gaps found</li>
-                          )}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Verdict Rationale */}
-                  <div className="p-4 rounded-xl bg-muted/20 border border-border/20">
-                    <p className="text-xs font-medium text-primary mb-1.5 flex items-center gap-1.5">
-                      <Brain className="h-3.5 w-3.5" /> AI Verdict Rationale
-                    </p>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{analysis.verdict_rationale}</p>
-                  </div>
-
-                  {/* Screen another */}
-                  <Button
-                    variant="outline"
-                    onClick={reset}
-                    className="w-full border-border/50 text-muted-foreground hover:text-foreground"
-                  >
-                    <Upload className="h-4 w-4 mr-2" /> Screen Another Resume
-                  </Button>
-                </motion.div>
+                <div className="py-12 text-center flex flex-col items-center">
+                   <div className="h-16 w-16 rounded-full gradient-primary flex items-center justify-center mb-4">
+                     <CheckCircle2 className="h-8 w-8 text-primary-foreground" />
+                   </div>
+                   <h2 className="text-xl font-bold font-display text-foreground mb-2">Analysis Complete!</h2>
+                   <p className="text-muted-foreground mb-6">Taking you to the detailed candidate profile...</p>
+                   <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                </div>
               )}
             </div>
 

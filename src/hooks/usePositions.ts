@@ -6,10 +6,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { positionsApi, candidatesApi } from '@/lib/api';
-import { ApiPosition, ApiCandidate, ApiPositionJD } from '@/types/api';
+import { ApiPosition, ApiCandidate, ApiPositionJD, ApiL1Question } from '@/types/api';
 import { useToast } from '@/hooks/use-toast';
 
-export type { ApiPosition as Position, ApiCandidate as Candidate };
+export type { ApiPosition as Position, ApiCandidate as Candidate, ApiL1Question as L1Question };
 
 interface UsePositionsReturn {
   positions: ApiPosition[];
@@ -21,6 +21,7 @@ interface UsePositionsReturn {
   deletePosition: (id: string) => Promise<void>;
   setPositionStatus: (id: string, status: 'Active' | 'Closed') => Promise<void>;
   saveJD: (positionId: string, jd: ApiPositionJD, version: number) => Promise<void>;
+  saveL1Questions: (positionId: string, questions: ApiL1Question[]) => Promise<void>;
   getCandidates: (positionId: string) => Promise<ApiCandidate[]>;
   addCandidate: (positionId: string, data: { name: string; role: string; email: string; stage: string }) => Promise<ApiCandidate>;
   updateCandidate: (candidateId: string, data: { stage?: string; verdict?: string }) => Promise<void>;
@@ -93,6 +94,11 @@ export function usePositions(): UsePositionsReturn {
     setPositions(prev => prev.map(p => p.id === positionId ? updated : p));
   }, []);
 
+  const saveL1Questions = useCallback(async (positionId: string, questions: ApiL1Question[]) => {
+    const updated = await positionsApi.saveL1Questions(positionId, questions);
+    setPositions(prev => prev.map(p => p.id === positionId ? updated : p));
+  }, []);
+
   const getCandidates = useCallback(async (positionId: string) => {
     return candidatesApi.list(positionId);
   }, []);
@@ -130,6 +136,7 @@ export function usePositions(): UsePositionsReturn {
     deletePosition,
     setPositionStatus,
     saveJD,
+    saveL1Questions,
     getCandidates,
     addCandidate,
     updateCandidate,

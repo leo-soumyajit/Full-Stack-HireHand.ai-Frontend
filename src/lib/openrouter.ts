@@ -1,5 +1,6 @@
 import { Question, QuestionCategory, QUESTION_CATEGORIES } from "@/types/questions";
 import { PositionJD } from "@/types/positions";
+import { ApiL1Question } from "@/types/api";
 
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 const OPENROUTER_MODEL = import.meta.env.VITE_OPENROUTER_MODEL || 'openai/gpt-4o-mini';
@@ -268,6 +269,109 @@ Required JSON format:
     }
   } catch (error) {
     console.error("Error enhancing full JD:", error);
+    throw error;
+  }
+}
+
+export async function generateL1Questions(
+  jobDescription: string,
+  role: string,
+  counts: { easy: number; medium: number; hard: number }
+): Promise<ApiL1Question[]> {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error("OpenRouter API Key is missing. Please set VITE_OPENROUTER_API_KEY in your .env.local file.");
+  }
+
+  const total = counts.easy + counts.medium + counts.hard;
+  if (total === 0) return [];
+
+  const systemPrompt = `You are an expert HR Technical Recruiter. Your task is to generate a highly structured, professional set of exactly ${total} 1st Level (L1) interview questions for the role of "${role}".
+The difficulty distribution MUST be exactly:
+- ${counts.easy} "Easy" questions
+- ${counts.medium} "Medium" questions
+- ${counts.hard} "Hard" questions
+
+Analyze the following Job Description (JD) to ensure the questions are tailored to the specific requirements and tech stack.
+For each question, assign it to ONE of the following precise categories: ${QUESTION_CATEGORIES.join(", ")}. Ensure there is a good mix of categories represented.
+
+You MUST respond strictly with a valid JSON object containing a single key "questions" which is an array of objects. Do not include any markdown formatting or explanations.
+
+Example required format:
+{
+  "questions": [
+    {
+      "id": "unique-string-1",
+      "text": "What is the primary advantage of using a virtual DOM in React?",
+      "category": "Technical",
+      "difficulty": "Easy"
+    },
+    {
+      "id": "unique-string-2",
+      "text": "Tell me about a time you had to lead a critical project under a tight deadline.",
+      "category": "Leadership",
+      "difficulty": "Medium"
+    }
+  ]
+}`;
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Please generate exactly ${total} interview questions (${counts.easy} Easy, ${counts.medium} Medium, ${counts.hard} Hard) based on this Job Description for the "${role}" role:\n\n${jobDescription}` }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData?.error?.message || `API request failed with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    let content = data.choices?.[0]?.message?.content;
+    
+    if (!content) {
+      throw new Error("Invalid response from OpenRouter API: No content returned.");
+    }
+
+    content = content.replace(/^```json\n?/, '').replace(/^```\n?/, '').replace(/```\n?$/, '').trim();
+
+    let parsedContent;
+    try {
+      parsedContent = JSON.parse(content);
+    } catch (parseError) {
+      console.error("Failed to parse JSON:", content);
+      throw new Error("Failed to parse JSON response from the AI model.");
+    }
+
+    let questionsArray: any[] = [];
+    if (parsedContent.questions && Array.isArray(parsedContent.questions)) {
+      questionsArray = parsedContent.questions;
+    } else if (Array.isArray(parsedContent)) {
+      questionsArray = parsedContent;
+    } else {
+      throw new Error("Invalid response format: Expected an object with a 'questions' array.");
+    }
+
+    // Ensure all questions have an ID and match the ApiL1Question interface
+    return questionsArray.map((q, index) => ({
+      id: q.id || "gen-" + Date.now() + "-" + index,
+      text: q.text || "Missing question text",
+      category: q.category || "Technical",
+      difficulty: ["Easy", "Medium", "Hard"].includes(q.difficulty) ? q.difficulty : "Medium"
+    })) as ApiL1Question[];
+
+  } catch (error) {
+    console.error("Error generating L1 questions from OpenRouter:", error);
     throw error;
   }
 }

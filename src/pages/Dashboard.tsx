@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -27,25 +28,39 @@ type DashboardView =
 const Dashboard = () => {
   const { toast } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [view, setView] = useState<DashboardView>("home");
-  const [activeSection, setActiveSection] = useState("home");
-  const [selectedPositionId, setSelectedPositionId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  const view = (searchParams.get("v") as DashboardView) || "home";
+  const activeSection = searchParams.get("s") || "home";
+  const selectedPositionId = searchParams.get("p") || null;
+
+  const setView = (newView: DashboardView) => setSearchParams(prev => { prev.set("v", newView); return prev; }, { replace: true });
+  const setActiveSection = (newSection: string) => setSearchParams(prev => { prev.set("s", newSection); return prev; }, { replace: true });
+  const setSelectedPositionId = (newId: string | null) => setSearchParams(prev => { if (newId) prev.set("p", newId); else prev.delete("p"); return prev; }, { replace: true });
+
   const [questions, setQuestions] = useState<Question[]>([]);
 
   const handleViewPosition = (id: string) => {
-    setSelectedPositionId(id);
-    setView("position-detail");
-    setActiveSection("positions");
+    setSearchParams(prev => {
+      prev.set("p", id);
+      prev.set("v", "position-detail");
+      prev.set("s", "positions");
+      return prev;
+    });
   };
 
   const handleBackToHome = () => {
-    // Go back to whichever section was active before drilling into a position
-    if (activeSection === "candidates") {
-      setView("candidates");
-    } else {
-      setView(activeSection === "positions" ? "positions" : "home");
-    }
-    setSelectedPositionId(null);
+    setSearchParams(prev => {
+      if (activeSection === "candidates") {
+        prev.set("v", "candidates");
+      } else {
+        prev.set("v", activeSection === "positions" ? "positions" : "home");
+      }
+      prev.delete("p");
+      prev.delete("t"); // clear position tab
+      prev.delete("c"); // clear viewing candidate id
+      return prev;
+    });
   };
 
   const handleGenerate = async (jd: string) => {
@@ -71,19 +86,19 @@ const Dashboard = () => {
   const handlePasteJD = () => setView("input");
 
   const handleSectionChange = (section: string) => {
-    setActiveSection(section);
-    setSelectedPositionId(null);
+    setSearchParams(prev => {
+      prev.set("s", section);
+      prev.delete("p");
+      prev.delete("t");
+      prev.delete("c");
 
-    if (section === "home") {
-      setView("home");
-    } else if (section === "positions") {
-      setView("positions");
-    } else if (section === "candidates") {
-      setView("candidates");
-    } else if (section === "scheduling") {
-      setView("scheduling");
-    }
-    // Other sections (analytics, etc.) — stay on current view for now
+      if (section === "home") prev.set("v", "home");
+      else if (section === "positions") prev.set("v", "positions");
+      else if (section === "candidates") prev.set("v", "candidates");
+      else if (section === "scheduling") prev.set("v", "scheduling");
+      
+      return prev;
+    });
   };
 
   // Positions view is identical to home (DashboardHome already has tabs for Open/Closed)

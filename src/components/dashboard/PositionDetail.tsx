@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -25,6 +26,7 @@ import {
   Loader2,
   RefreshCw,
   X,
+  ListChecks,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +37,10 @@ import { usePositions } from "@/hooks/usePositions";
 import { enhanceJDWithAI, enhanceFullJDWithAI } from "@/lib/openrouter";
 import { useToast } from "@/hooks/use-toast";
 import { CandidatesTab } from "@/components/dashboard/CandidatesTab";
+import { CandidateDetailView } from "@/components/dashboard/CandidateDetailView";
 import { PsychometricScoringModal } from "@/components/dashboard/PsychometricScoringModal";
 import { FitmentReportPanel } from "@/components/dashboard/FitmentReportPanel";
+import { PositionL1QuestionsTab } from "@/components/dashboard/PositionL1QuestionsTab";
 import { psychometricApi } from "@/lib/psychometricApi";
 import type { PsychometricProfile, FitmentReport } from "@/types/psychometric";
 
@@ -44,6 +48,7 @@ const TABS = [
   { id: "overview", label: "Overview", icon: Briefcase },
   { id: "jd", label: "JD", icon: FileText },
   { id: "candidates", label: "Candidates", icon: Users },
+  { id: "l1-questions", label: "Interview L1", icon: ListChecks },
   { id: "psychometrics", label: "Psychometrics", icon: Brain },
   { id: "interviews", label: "Interviews", icon: Video },
   { id: "decision-pack", label: "Decision Pack", icon: Package },
@@ -58,8 +63,14 @@ interface PositionDetailProps {
 }
 
 export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
-  const [activeTab, setActiveTab] = useState("overview");
-  const { positions, saveJD, addCandidate, deleteCandidate, getCandidates, isLoading, setCandidatesCount } = usePositions();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("t") || "overview";
+  const viewingCandidateId = searchParams.get("c") || null;
+
+  const setActiveTab = (tab: string) => setSearchParams(prev => { prev.set("t", tab); return prev; }, { replace: true });
+  const setViewingCandidateId = (cid: string | null) => setSearchParams(prev => { if (cid) prev.set("c", cid); else prev.delete("c"); return prev; }, { replace: true });
+
+  const { positions, saveJD, saveL1Questions, addCandidate, deleteCandidate, getCandidates, isLoading, setCandidatesCount } = usePositions();
 
   // EOS-IA Psychometric state
   const [psychProfile, setPsychProfile] = useState<PsychometricProfile | null>(null);
@@ -128,6 +139,16 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
     );
   }
 
+  if (viewingCandidateId) {
+    return (
+      <CandidateDetailView 
+        candidateId={viewingCandidateId} 
+        positionId={positionId} 
+        onBack={() => setViewingCandidateId(null)} 
+      />
+    );
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       {/* Header */}
@@ -184,6 +205,7 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
           positionId={positionId}
           onAddCandidate={(data) => addCandidate(positionId, data)}
           positionTitle={position.title}
+          onViewCandidate={(id) => setViewingCandidateId(id)}
           onDeleteCandidate={deleteCandidate}
           getCandidates={getCandidates}
           onCandidatesLoaded={handleCandidatesLoaded}
@@ -194,6 +216,12 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
             setSelectedCandidateForReport({ id: candidateId, name: candidateName });
             setActiveTab("psychometrics");
           }}
+        />
+      )}
+      {activeTab === "l1-questions" && (
+        <PositionL1QuestionsTab 
+          position={position} 
+          onSave={async (q) => { await saveL1Questions(position.id, q); }} 
         />
       )}
       {activeTab === "psychometrics" && (
@@ -211,7 +239,7 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
           onClearSelectedCandidate={() => setSelectedCandidateForReport(null)}
         />
       )}
-      {!["overview", "jd", "candidates", "psychometrics"].includes(activeTab) && (
+      {!["overview", "jd", "candidates", "l1-questions", "psychometrics"].includes(activeTab) && (
         <Card className="glass-strong">
           <CardContent className="p-12 text-center">
             <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-muted mb-4">

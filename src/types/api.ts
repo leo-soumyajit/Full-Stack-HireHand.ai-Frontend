@@ -17,6 +17,13 @@ export interface ApiJDVersion {
   createdAt: string;
 }
 
+export interface ApiL1Question {
+  id: string;
+  text: string;
+  category: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+}
+
 export interface ApiPosition {
   id: string;
   req_id: string;
@@ -28,6 +35,7 @@ export interface ApiPosition {
   status: string;
   jd?: ApiPositionJD | null;
   jd_versions: ApiJDVersion[];
+  l1_questions?: ApiL1Question[];
   candidates_count: number;
   shortlisted_count: number;
   risk_flag?: string | null;
@@ -52,4 +60,17 @@ export interface ApiCandidate {
   scores: ApiCandidateScores;
   verdict: string;
   added_date: string;
+  resume_analysis?: {
+    candidate_name: string;
+    candidate_email: string;
+    candidate_current_role: string;
+    resume_score: number;
+    jd_match_percent: number;
+    recommended_stage: string;
+    verdict: string;
+    strengths: string[];
+    gaps: string[];
+    verdict_rationale: string;
+    experience_summary?: string;
+  };
 }
