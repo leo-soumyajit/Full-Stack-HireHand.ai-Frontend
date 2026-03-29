@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import CandidateAssessment from "./pages/CandidateAssessment";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
                   </ProtectedRoute>
                 } 
               />
+              <Route path="/assessment/:token" element={<CandidateAssessment />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

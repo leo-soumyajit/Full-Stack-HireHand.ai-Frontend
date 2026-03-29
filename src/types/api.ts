@@ -22,6 +22,7 @@ export interface ApiL1Question {
   text: string;
   category: string;
   difficulty: "Easy" | "Medium" | "Hard";
+  level?: string; // "L1" | "L2" | "L3" | "L4" | "L5"
 }
 
 export interface ApiPosition {

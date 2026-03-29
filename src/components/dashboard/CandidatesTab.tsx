@@ -16,6 +16,8 @@ import {
   CalendarIcon,
   Mail,
   Send,
+  UserMinus,
+  RotateCcw,
 } from "lucide-react";
 import { ResumeScreeningModal } from "./ResumeScreeningModal";
 import { SchedulingModal } from "./SchedulingModal";
@@ -53,6 +55,7 @@ import { useToast } from "@/hooks/use-toast";
 import { psychometricApi } from "@/lib/psychometricApi";
 import { generateFitmentPDF } from "@/lib/generateFitmentPDF";
 import { emailApi } from "@/lib/emailApi";
+import { assessmentApi, candidatesApi } from "@/lib/api";
 
 const STAGES = ["Sourced", "Screened", "Interview L1", "Interview L2", "Offer", "Rejected"];
 
@@ -114,6 +117,7 @@ export function CandidatesTab({
   const [schedulingModalOpen, setSchedulingModalOpen] = useState<{ candidateId: string; candidateName: string } | null>(null);
   const [topN, setTopN] = useState<string>("");
   const [isSendingMail, setIsSendingMail] = useState<string | false>(false);
+  const [dispatchingStatus, setDispatchingStatus] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   const displayCandidates = useMemo(() => {
@@ -223,6 +227,38 @@ export function CandidatesTab({
     }
   };
 
+  const handleReject = async (candidateId: string) => {
+    // Optimistic update
+    setCandidates((prev) =>
+      prev.map((c) =>
+        c.id === candidateId ? { ...c, stage: "Rejected", verdict: "No-Go" } : c
+      )
+    );
+    try {
+      await candidatesApi.update(candidateId, { stage: "Rejected", verdict: "No-Go" });
+      toast({ title: "Candidate rejected" });
+    } catch (err) {
+      await loadCandidates();
+      toast({ title: "Failed to reject", description: String(err), variant: "destructive" });
+    }
+  };
+
+  const handleRevert = async (candidateId: string) => {
+    // Optimistic update
+    setCandidates((prev) =>
+      prev.map((c) =>
+        c.id === candidateId ? { ...c, stage: "Sourced", verdict: "Conditional" } : c
+      )
+    );
+    try {
+      await candidatesApi.update(candidateId, { stage: "Sourced", verdict: "Conditional" });
+      toast({ title: "Rejection reverted" });
+    } catch (err) {
+      await loadCandidates();
+      toast({ title: "Failed to revert", description: String(err), variant: "destructive" });
+    }
+  };
+
   const handleDownloadPDF = async (candidateId: string, candidateName: string) => {
     setDownloadingPDF(candidateId);
     try {
@@ -237,6 +273,18 @@ export function CandidatesTab({
       });
     } finally {
       setDownloadingPDF(null);
+    }
+  };
+
+  const handleDispatchAssessment = async (candidateId: string) => {
+    setDispatchingStatus(prev => ({ ...prev, [candidateId]: true }));
+    try {
+      await assessmentApi.send({ position_id: positionId, candidate_id: candidateId });
+      toast({ title: "Assessment Dispatched!", description: "Magic link sent to candidate successfully." });
+    } catch (err: any) {
+      toast({ title: "Dispatch Failed", description: err.message || String(err), variant: "destructive" });
+    } finally {
+      setDispatchingStatus(prev => ({ ...prev, [candidateId]: false }));
     }
   };
 
@@ -296,9 +344,9 @@ export function CandidatesTab({
                 <MoreVertical className="h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card border-border/50 z-50 w-52">
+            <DropdownMenuContent align="end" className="bg-card border-border/50 z-50 w-56">
               <DropdownMenuItem onClick={() => onScorePsychometric?.(c.id, c.name)} className="gap-2 cursor-pointer">
-                <Brain className="h-4 w-4 text-primary" /><span>Score Psychometric</span>
+                <Brain className="h-4 w-4 text-primary" /><span>Manual Score (Legacy)</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewReport?.(c.id, c.name)} className="gap-2 cursor-pointer">
                 <FileBarChart className="h-4 w-4 text-emerald-400" /><span>View Fitment Report</span>
@@ -311,6 +359,20 @@ export function CandidatesTab({
                 <span>{downloadingPDF === c.id ? "Generating PDF..." : "Download PDF Report"}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-border/40" />
+              <DropdownMenuItem onClick={() => handleDispatchAssessment(c.id)} disabled={dispatchingStatus[c.id] || isManuallyRejected} className="gap-2 cursor-pointer">
+                {dispatchingStatus[c.id] ? <Loader2 className="h-4 w-4 animate-spin text-purple-400" /> : <Send className="h-4 w-4 text-purple-400" />}
+                <span>{dispatchingStatus[c.id] ? "Dispatching..." : "Dispatch Assessment"}</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-border/40" />
+              {!isManuallyRejected ? (
+                <DropdownMenuItem onClick={() => handleReject(c.id)} className="text-orange-400 focus:text-orange-400 focus:bg-orange-500/10 gap-2 cursor-pointer">
+                  <UserMinus className="h-4 w-4" /><span>Reject Candidate</span>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={() => handleRevert(c.id)} className="text-emerald-400 focus:text-emerald-400 focus:bg-emerald-500/10 gap-2 cursor-pointer">
+                  <RotateCcw className="h-4 w-4" /><span>Undo Rejection</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => handleDelete(c.id)} className="text-red-400 focus:text-red-400 focus:bg-red-500/10 gap-2 cursor-pointer">
                 <Trash2 className="h-4 w-4" /><span>Remove</span>
               </DropdownMenuItem>

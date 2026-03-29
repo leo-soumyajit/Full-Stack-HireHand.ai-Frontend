@@ -273,11 +273,42 @@ Required JSON format:
   }
 }
 
-export async function generateL1Questions(
-  jobDescription: string,
-  role: string,
-  counts: { easy: number; medium: number; hard: number }
-): Promise<ApiL1Question[]> {
+export const INTERVIEW_LEVELS = ["L1", "L2", "L3", "L4", "L5"] as const;
+export type InterviewLevel = typeof INTERVIEW_LEVELS[number];
+
+export const INTERVIEW_CATEGORIES = [
+  "Technical",
+  "Behavioral",
+  "Problem Solving",
+  "Aptitude",
+  "Managerial",
+  "Communication",
+  "Cultural Fit",
+  "Leadership",
+  "Domain Knowledge",
+  "System Design",
+  "Math & Logical",
+] as const;
+export type InterviewCategory = typeof INTERVIEW_CATEGORIES[number];
+
+interface GenerateInterviewQuestionsParams {
+  jobDescription: string;
+  role: string;
+  level: InterviewLevel;
+  category: string;
+  counts: { easy: number; medium: number; hard: number };
+  /** Existing questions across all levels — passed to AI to avoid duplication */
+  existingQuestions?: ApiL1Question[];
+}
+
+export async function generateInterviewQuestions({
+  jobDescription,
+  role,
+  level,
+  category,
+  counts,
+  existingQuestions,
+}: GenerateInterviewQuestionsParams): Promise<ApiL1Question[]> {
   if (!OPENROUTER_API_KEY) {
     throw new Error("OpenRouter API Key is missing. Please set VITE_OPENROUTER_API_KEY in your .env.local file.");
   }
@@ -285,34 +316,48 @@ export async function generateL1Questions(
   const total = counts.easy + counts.medium + counts.hard;
   if (total === 0) return [];
 
-  const systemPrompt = `You are an expert HR Technical Recruiter. Your task is to generate a highly structured, professional set of exactly ${total} 1st Level (L1) interview questions for the role of "${role}".
-The difficulty distribution MUST be exactly:
-- ${counts.easy} "Easy" questions
-- ${counts.medium} "Medium" questions
-- ${counts.hard} "Hard" questions
+  const levelDescriptions: Record<string, string> = {
+    L1: "Initial Screening — assess fundamental knowledge, basic technical competency, and cultural fit",
+    L2: "Deep Technical — assess hands-on problem-solving, system design aptitude, and practical experience",
+    L3: "Senior/Staff — assess architectural thinking, leadership under ambiguity, and cross-functional impact",
+    L4: "Principal/Director — assess strategic vision, organizational influence, and large-scale decision-making",
+    L5: "VP/C-Level — assess executive judgment, business acumen, and transformational leadership",
+  };
 
-Analyze the following Job Description (JD) to ensure the questions are tailored to the specific requirements and tech stack.
-For each question, assign it to ONE of the following precise categories: ${QUESTION_CATEGORIES.join(", ")}. Ensure there is a good mix of categories represented.
+  const systemPrompt = `You are an elite HR Technical Recruiter at a FAANG-level organization. Generate exactly ${total} highly professional "${level}" interview questions for the role of **"${role}"**.
+
+INTERVIEW LEVEL: ${level} — ${levelDescriptions[level] || "Standard interview assessment"}
+QUESTION CATEGORY: ${category}
+DIFFICULTY DISTRIBUTION:
+- ${counts.easy} "Easy" questions (foundational, direct-answer, knowledge-check)
+- ${counts.medium} "Medium" questions (scenario-based, requires experience and reasoning)
+- ${counts.hard} "Hard" questions (complex, multi-layered, requires deep expertise and strategic thinking)
+
+RULES:
+1. ALL ${total} questions MUST be specifically in the "${category}" category.
+2. Each question must be directly relevant to the JD provided.
+3. Questions should progressively increase in depth based on difficulty.
+4. For ${level}, calibrate the overall depth accordingly — ${level === "L1" ? "keep it screening-level" : level === "L2" ? "go deeper into hands-on experience" : "probe for leadership, vision, and system-level thinking"}.
+5. Do NOT generate generic questions. Every question must reference or be derived from the specific JD context.
 
 You MUST respond strictly with a valid JSON object containing a single key "questions" which is an array of objects. Do not include any markdown formatting or explanations.
 
-Example required format:
+Required format:
 {
   "questions": [
     {
       "id": "unique-string-1",
-      "text": "What is the primary advantage of using a virtual DOM in React?",
-      "category": "Technical",
+      "text": "Your question text here?",
+      "category": "${category}",
       "difficulty": "Easy"
-    },
-    {
-      "id": "unique-string-2",
-      "text": "Tell me about a time you had to lead a critical project under a tight deadline.",
-      "category": "Leadership",
-      "difficulty": "Medium"
     }
   ]
-}`;
+}${existingQuestions && existingQuestions.length > 0 ? `
+
+CRITICAL — DO NOT REPEAT: The following questions already exist in the system across various interview levels. Your newly generated questions MUST be completely different and unique. Do NOT rephrase or paraphrase these — generate entirely new questions.
+
+Existing questions to AVOID:
+${existingQuestions.map((q, i) => `${i + 1}. [${q.level || 'L1'}] ${q.text}`).join('\n')}` : ''}`;
 
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -326,7 +371,7 @@ Example required format:
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Please generate exactly ${total} interview questions (${counts.easy} Easy, ${counts.medium} Medium, ${counts.hard} Hard) based on this Job Description for the "${role}" role:\n\n${jobDescription}` }
+          { role: "user", content: `Generate exactly ${total} ${level} "${category}" interview questions (${counts.easy} Easy, ${counts.medium} Medium, ${counts.hard} Hard) based on this Job Description for the "${role}" role:\n\n${jobDescription}` }
         ]
       })
     });
@@ -362,16 +407,26 @@ Example required format:
       throw new Error("Invalid response format: Expected an object with a 'questions' array.");
     }
 
-    // Ensure all questions have an ID and match the ApiL1Question interface
     return questionsArray.map((q, index) => ({
-      id: q.id || "gen-" + Date.now() + "-" + index,
+      id: q.id || `${level.toLowerCase()}-${category.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}-${index}`,
       text: q.text || "Missing question text",
-      category: q.category || "Technical",
-      difficulty: ["Easy", "Medium", "Hard"].includes(q.difficulty) ? q.difficulty : "Medium"
+      category: q.category || category,
+      difficulty: ["Easy", "Medium", "Hard"].includes(q.difficulty) ? q.difficulty : "Medium",
+      level,
     })) as ApiL1Question[];
 
   } catch (error) {
-    console.error("Error generating L1 questions from OpenRouter:", error);
+    console.error("Error generating interview questions from OpenRouter:", error);
     throw error;
   }
 }
+
+/** @deprecated Use generateInterviewQuestions instead */
+export async function generateL1Questions(
+  jobDescription: string,
+  role: string,
+  counts: { easy: number; medium: number; hard: number }
+): Promise<ApiL1Question[]> {
+  return generateInterviewQuestions({ jobDescription, role, level: "L1", category: "Technical", counts });
+}
+

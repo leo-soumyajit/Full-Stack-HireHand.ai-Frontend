@@ -6,6 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MainLoader } from "@/components/ui/main-loader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FitmentReportPanel } from "./FitmentReportPanel";
+import { PsychometricScoringModal } from "./PsychometricScoringModal";
 import { ApiCandidate } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
@@ -24,6 +27,7 @@ function getToken(): string | null {
 interface Props {
   candidateId: string;
   positionId: string;
+  initialTab?: string;
   onBack: () => void;
 }
 
@@ -37,10 +41,13 @@ function scoreColor(score: number) {
   return "text-red-400";
 }
 
-export function CandidateDetailView({ candidateId, positionId, onBack }: Props) {
+export function CandidateDetailView({ candidateId, positionId, initialTab = "resume", onBack }: Props) {
   const [candidate, setCandidate] = useState<ApiCandidate | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [scoringModalOpen, setScoringModalOpen] = useState(false);
+  const [newlyGeneratedReport, setNewlyGeneratedReport] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState(initialTab);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -129,9 +136,14 @@ export function CandidateDetailView({ candidateId, positionId, onBack }: Props) 
             <MainLoader text="Retrieving full AI analysis profile..." />
           </div>
         ) : (
-          <div className="space-y-8 max-w-5xl mx-auto">
-            
-            {/* Score Grid */}
+          <div className="max-w-5xl mx-auto space-y-6 mt-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+                <TabsTrigger value="resume">Resume Analysis</TabsTrigger>
+                <TabsTrigger value="psychometric">Fitment Report</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="resume" className="space-y-8 mt-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-4">
               <div className="p-6 rounded-2xl bg-gradient-to-br from-card to-muted/50 border border-border/40 flex items-center justify-between shadow-md hover:border-primary/30 transition-colors">
                 <div>
@@ -211,7 +223,6 @@ export function CandidateDetailView({ candidateId, positionId, onBack }: Props) 
               </div>
             )}
 
-            {/* Justification Block */}
             {candidate.resume_analysis?.verdict_rationale && (
               <div className="p-8 mt-8 rounded-2xl bg-card border border-primary/20 shadow-xl overflow-hidden relative group">
                 <div className="absolute top-0 left-0 w-2 h-full gradient-primary" />
@@ -224,9 +235,42 @@ export function CandidateDetailView({ candidateId, positionId, onBack }: Props) 
                 </p>
               </div>
             )}
+            </TabsContent>
+
+            <TabsContent value="psychometric" className="mt-6">
+              <div className="mb-6 p-4 rounded-xl border border-primary/20 bg-primary/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-foreground font-display flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    EOS-IA Fitment Report for {candidate.name}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Comprehensive behavioral and cultural alignment analysis based on psychometric evaluation.
+                  </p>
+                </div>
+              </div>
+              
+              <FitmentReportPanel
+                candidateId={candidateId}
+                candidateName={candidate.name}
+                positionId={positionId}
+                initialReport={newlyGeneratedReport}
+                onOpenScoring={() => setScoringModalOpen(true)}
+              />
+            </TabsContent>
+            </Tabs>
           </div>
         )}
       </ScrollArea>
+
+      <PsychometricScoringModal
+        open={scoringModalOpen}
+        onClose={() => setScoringModalOpen(false)}
+        candidateId={candidateId}
+        candidateName={candidate?.name || ""}
+        positionId={positionId}
+        onReportGenerated={(r) => setNewlyGeneratedReport(r)}
+      />
     </motion.div>
   );
 }

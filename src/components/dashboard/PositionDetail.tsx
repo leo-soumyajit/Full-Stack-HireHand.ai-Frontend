@@ -36,6 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ApiPosition, ApiPositionJD } from "@/types/api";
 import { usePositions } from "@/hooks/usePositions";
 import { enhanceJDWithAI, enhanceFullJDWithAI } from "@/lib/openrouter";
+import { PsychometricsTab } from "@/components/dashboard/PsychometricsTab";
 import { useToast } from "@/hooks/use-toast";
 import { CandidatesTab } from "@/components/dashboard/CandidatesTab";
 import { CandidateDetailView } from "@/components/dashboard/CandidateDetailView";
@@ -44,12 +45,14 @@ import { FitmentReportPanel } from "@/components/dashboard/FitmentReportPanel";
 import { PositionL1QuestionsTab } from "@/components/dashboard/PositionL1QuestionsTab";
 import { psychometricApi } from "@/lib/psychometricApi";
 import type { PsychometricProfile, FitmentReport } from "@/types/psychometric";
+import { JDComparisonSlider } from "@/components/ui/jd-comparison-slider";
+import { computeJDDiff, type DiffSegment, type ItemDiff } from "@/lib/jd-diff-utils";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: Briefcase },
   { id: "jd", label: "JD", icon: FileText },
   { id: "candidates", label: "Candidates", icon: Users },
-  { id: "l1-questions", label: "Interview L1", icon: ListChecks },
+  { id: "l1-questions", label: "Interview Questions", icon: ListChecks },
   { id: "psychometrics", label: "Psychometrics", icon: Brain },
   { id: "interviews", label: "Interviews", icon: Video },
   { id: "decision-pack", label: "Decision Pack", icon: Package },
@@ -67,9 +70,14 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("t") || "overview";
   const viewingCandidateId = searchParams.get("c") || null;
+  const viewingCandidateTab = searchParams.get("ct") || "resume";
 
   const setActiveTab = (tab: string) => setSearchParams(prev => { prev.set("t", tab); return prev; }, { replace: true });
-  const setViewingCandidateId = (cid: string | null) => setSearchParams(prev => { if (cid) prev.set("c", cid); else prev.delete("c"); return prev; }, { replace: true });
+  const setViewingCandidateId = (cid: string | null, cTab?: string) => setSearchParams(prev => { 
+    if (cid) { prev.set("c", cid); if (cTab) prev.set("ct", cTab); else prev.delete("ct"); } 
+    else { prev.delete("c"); prev.delete("ct"); } 
+    return prev; 
+  }, { replace: true });
 
   const { positions, saveJD, saveL1Questions, addCandidate, deleteCandidate, getCandidates, isLoading, setCandidatesCount } = usePositions();
 
@@ -78,7 +86,6 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
   const [psychProfileLoading, setPsychProfileLoading] = useState(false);
   const [scoringModal, setScoringModal] = useState<{ open: boolean; candidateId: string; candidateName: string } | null>(null);
   const [fitmentReports, setFitmentReports] = useState<Record<string, FitmentReport>>({});
-  const [selectedCandidateForReport, setSelectedCandidateForReport] = useState<{ id: string; name: string } | null>(null);
 
   const position = useMemo(() => {
     return positions.find((p) => p.id === positionId) || null;
@@ -120,6 +127,10 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
     setCandidatesCount(positionId, count);
   }, [positionId, setCandidatesCount]);
 
+  const handleOpenScoring = useCallback((candidateId: string, candidateName: string) => {
+    setScoringModal({ open: true, candidateId, candidateName });
+  }, []);
+
   if (isLoading && !position) {
     return (
       <div className="py-20">
@@ -144,6 +155,7 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
       <CandidateDetailView 
         candidateId={viewingCandidateId} 
         positionId={positionId} 
+        initialTab={viewingCandidateTab}
         onBack={() => setViewingCandidateId(null)} 
       />
     );
@@ -209,12 +221,9 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
           onDeleteCandidate={deleteCandidate}
           getCandidates={getCandidates}
           onCandidatesLoaded={handleCandidatesLoaded}
-          onScorePsychometric={(candidateId, candidateName) =>
-            setScoringModal({ open: true, candidateId, candidateName })
-          }
+          onScorePsychometric={handleOpenScoring}
           onViewReport={(candidateId, candidateName) => {
-            setSelectedCandidateForReport({ id: candidateId, name: candidateName });
-            setActiveTab("psychometrics");
+            setViewingCandidateId(candidateId, "psychometric");
           }}
         />
       )}
@@ -227,16 +236,11 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
       {activeTab === "psychometrics" && (
         <PsychometricsTab
           position={position}
-          psychProfile={psychProfile}
-          psychProfileLoading={psychProfileLoading}
-          onLoadProfile={loadPsychProfile}
-          onGenerateProfile={handleGenerateProfile}
-          selectedCandidate={selectedCandidateForReport}
           fitmentReports={fitmentReports}
-          onOpenScoring={(candidateId, candidateName) =>
-            setScoringModal({ open: true, candidateId, candidateName })
-          }
-          onClearSelectedCandidate={() => setSelectedCandidateForReport(null)}
+          onOpenScoring={handleOpenScoring}
+          onViewReport={(candidateId, candidateName) => {
+            setViewingCandidateId(candidateId, "psychometric");
+          }}
         />
       )}
       {!["overview", "jd", "candidates", "l1-questions", "psychometrics"].includes(activeTab) && (
@@ -263,8 +267,7 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
           positionId={positionId}
           onReportGenerated={(report) => {
             setFitmentReports(prev => ({ ...prev, [scoringModal.candidateId]: report }));
-            setSelectedCandidateForReport({ id: scoringModal.candidateId, name: scoringModal.candidateName });
-            setActiveTab("psychometrics");
+            setViewingCandidateId(scoringModal.candidateId, "psychometric");
           }}
         />
       )}
@@ -331,11 +334,247 @@ function OverviewTab({ position }: { position: ApiPosition }) {
   );
 }
 
+/* ── Diff rendering helpers ───────────────────────────────────────────────── */
+
+function DiffWordSegments({ segments, side }: { segments: DiffSegment[]; side: "before" | "after" }) {
+  return (
+    <>
+      {segments.map((seg, i) => {
+        if (seg.type === "same") {
+          return <span key={i}>{seg.text}</span>;
+        }
+        if (seg.type === "removed" && side === "before") {
+          return (
+            <span
+              key={i}
+              className="bg-red-500/20 text-red-400 dark:bg-red-500/15 dark:text-red-300 rounded px-0.5 line-through decoration-red-400/50"
+            >
+              {seg.text}
+            </span>
+          );
+        }
+        if (seg.type === "added" && side === "after") {
+          return (
+            <span
+              key={i}
+              className="bg-emerald-500/20 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300 rounded px-0.5"
+            >
+              {seg.text}
+            </span>
+          );
+        }
+        // Hide removed words on after side and added words on before side
+        return null;
+      })}
+    </>
+  );
+}
+
+function DiffItemRenderer({ item, index, side, numbered }: { item: ItemDiff; index: number; side: "before" | "after"; numbered?: boolean }) {
+  const bullet = numbered
+    ? <span className="text-primary font-bold shrink-0">{index + 1}.</span>
+    : <span className="text-primary mt-0.5 shrink-0">•</span>;
+
+  if (item.status === "same") {
+    return (
+      <li className="text-xs text-muted-foreground flex items-start gap-1.5">
+        {bullet} {item.text}
+      </li>
+    );
+  }
+
+  if (item.status === "removed" && side === "before") {
+    return (
+      <li className="text-xs flex items-start gap-1.5 rounded-md px-1.5 py-0.5 -mx-1.5 bg-red-500/10 border border-red-500/20">
+        {bullet}
+        <span className="text-red-400 dark:text-red-300 line-through decoration-red-400/50">{item.text}</span>
+      </li>
+    );
+  }
+
+  if (item.status === "added" && side === "after") {
+    return (
+      <li className="text-xs flex items-start gap-1.5 rounded-md px-1.5 py-0.5 -mx-1.5 bg-emerald-500/10 border border-emerald-500/20">
+        {bullet}
+        <span className="text-emerald-600 dark:text-emerald-300">{item.text}</span>
+      </li>
+    );
+  }
+
+  if (item.status === "modified" && item.wordDiff) {
+    const bgClass = side === "before"
+      ? "bg-amber-500/10 border border-amber-500/20"
+      : "bg-emerald-500/10 border border-emerald-500/20";
+    return (
+      <li className={`text-xs flex items-start gap-1.5 rounded-md px-1.5 py-0.5 -mx-1.5 ${bgClass}`}>
+        {bullet}
+        <span className="text-muted-foreground">
+          <DiffWordSegments segments={item.wordDiff} side={side} />
+        </span>
+      </li>
+    );
+  }
+
+  // Fallback
+  return (
+    <li className="text-xs text-muted-foreground flex items-start gap-1.5">
+      {bullet} {item.text}
+    </li>
+  );
+}
+
+/* ── JDContentCard — supports optional diff highlighting ─────────────────── */
+
+interface JDContentCardProps {
+  jd: ApiPositionJD;
+  className?: string;
+  /** Pass the other JD to enable diff highlighting */
+  compareWith?: ApiPositionJD;
+  /** Which side this card represents */
+  side?: "before" | "after";
+}
+
+function JDContentCard({ jd, className = "", compareWith, side }: JDContentCardProps) {
+  // Compute diff if comparison data is provided
+  const diff = useMemo(() => {
+    if (!compareWith || !side) return null;
+    return computeJDDiff(
+      side === "before" ? jd : compareWith,
+      side === "before" ? compareWith : jd,
+      side
+    );
+  }, [jd, compareWith, side]);
+
+  return (
+    <div className={`space-y-4 p-5 bg-background min-h-full ${className}`}>
+      {/* Role Purpose */}
+      <div className="rounded-xl border border-border/30 bg-muted/20 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Briefcase className="h-3.5 w-3.5 text-primary shrink-0" />
+          <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wide">Role Purpose</h4>
+        </div>
+        {diff && diff.purposeChanged && side ? (
+          <p className="text-xs leading-relaxed whitespace-pre-wrap">
+            <DiffWordSegments segments={diff.purposeDiff} side={side} />
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">{jd.purpose}</p>
+        )}
+      </div>
+
+      {/* Education */}
+      <div className="rounded-xl border border-border/30 bg-muted/20 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <GraduationCap className="h-3.5 w-3.5 text-primary shrink-0" />
+          <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wide">Education</h4>
+        </div>
+        <ul className="space-y-1">
+          {diff && side ? (
+            diff.education.map((item, i) => (
+              <DiffItemRenderer key={i} item={item} index={i} side={side} />
+            ))
+          ) : (
+            jd.education.map((e, i) => (
+              <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                <span className="text-primary mt-0.5 shrink-0">•</span> {e}
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
+
+      {/* Experience */}
+      <div className="rounded-xl border border-border/30 bg-muted/20 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+          <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wide">Experience</h4>
+        </div>
+        <ul className="space-y-1">
+          {diff && side ? (
+            diff.experience.map((item, i) => (
+              <DiffItemRenderer key={i} item={item} index={i} side={side} />
+            ))
+          ) : (
+            jd.experience.map((e, i) => (
+              <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                <span className="text-primary mt-0.5 shrink-0">•</span> {e}
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
+
+      {/* Responsibilities */}
+      <div className="rounded-xl border border-border/30 bg-muted/20 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Star className="h-3.5 w-3.5 text-primary shrink-0" />
+          <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wide">Responsibilities</h4>
+        </div>
+        <ul className="space-y-1">
+          {diff && side ? (
+            diff.responsibilities.map((item, i) => (
+              <DiffItemRenderer key={i} item={item} index={i} side={side} numbered />
+            ))
+          ) : (
+            jd.responsibilities.map((r, i) => (
+              <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                <span className="text-primary font-bold shrink-0">{i + 1}.</span> {r}
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
+
+      {/* Skills */}
+      <div className="rounded-xl border border-border/30 bg-muted/20 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Target className="h-3.5 w-3.5 text-primary shrink-0" />
+          <h4 className="text-xs font-bold text-foreground font-display uppercase tracking-wide">Skills</h4>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {diff && side ? (
+            diff.skills.map((s) => {
+              if (s.status === "removed") {
+                return (
+                  <span key={s.text} className="text-[10px] bg-red-500/15 text-red-400 dark:text-red-300 border border-red-500/25 rounded-md px-2 py-0.5 line-through">
+                    {s.text}
+                  </span>
+                );
+              }
+              if (s.status === "added") {
+                return (
+                  <span key={s.text} className="text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/25 rounded-md px-2 py-0.5">
+                    {s.text}
+                  </span>
+                );
+              }
+              return (
+                <span key={s.text} className="text-[10px] bg-primary/10 text-primary border border-primary/20 rounded-md px-2 py-0.5">{s.text}</span>
+              );
+            })
+          ) : (
+            jd.skills.map((s) => (
+              <span key={s} className="text-[10px] bg-primary/10 text-primary border border-primary/20 rounded-md px-2 py-0.5">{s}</span>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd: ApiPositionJD, versionCounter: number) => void }) {
   const { toast } = useToast();
-  const [jdView, setJdView] = useState<"choice" | "paste" | "enhance_full" | "view">("view");
+  const [jdView, setJdView] = useState<"choice" | "paste" | "enhance_full" | "view" | "compare">("view");
   const [jdText, setJdText] = useState("");
   const [isEnhancing, setIsEnhancing] = useState(false);
+  
+  // Version to use as the BASE for enhancement (dropdown selection)
+  const [enhanceBaseVersionId, setEnhanceBaseVersionId] = useState<number | null>(null);
+  
+  // Comparison state: before JD and after JD for the slider
+  const [compareBeforeJD, setCompareBeforeJD] = useState<ApiPositionJD | null>(null);
+  const [compareAfterJD, setCompareAfterJD] = useState<ApiPositionJD | null>(null);
   
   // Track selected version separately from the "latest"
   const defaultVersion = position.jd_versions && position.jd_versions.length > 0
@@ -352,20 +591,40 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
     return position.jd;
   }, [position, selectedVersionId]);
 
+  // Get the JD for the selected enhance base version
+  const enhanceBaseJD = useMemo(() => {
+    if (enhanceBaseVersionId === null) return displayJD;
+    if (position.jd_versions && position.jd_versions.length > 0) {
+      const ver = position.jd_versions.find(v => v.version === enhanceBaseVersionId);
+      if (ver) return ver.jd;
+    }
+    return position.jd;
+  }, [enhanceBaseVersionId, position, displayJD]);
+
   const handleSaveJD = async () => {
     if (!jdText.trim()) return;
     setIsEnhancing(true);
     try {
-      // Pass the current displayJD as context so the AI knows what to modify
-      const enhancedJD = await enhanceJDWithAI(jdText, displayJD || undefined);
-      const nextVersion = (position.jd_versions?.length ?? 0) + 1;
-      onJDSaved(enhancedJD, nextVersion);
-      setSelectedVersionId(nextVersion);
-      setJdView("view");
-      toast({
-        title: "JD Enhanced successfully",
-        description: `Version ${nextVersion} saved.`,
-      });
+      // Pass the selected base version JD as context
+      const baseJD = enhanceBaseJD || displayJD || undefined;
+      const enhancedJD = await enhanceJDWithAI(jdText, baseJD);
+      
+      // Store before and after for comparison
+      if (baseJD) {
+        setCompareBeforeJD(baseJD);
+        setCompareAfterJD(enhancedJD);
+        setJdView("compare");
+      } else {
+        // No existing JD → save directly
+        const nextVersion = (position.jd_versions?.length ?? 0) + 1;
+        onJDSaved(enhancedJD, nextVersion);
+        setSelectedVersionId(nextVersion);
+        setJdView("view");
+        toast({
+          title: "JD Enhanced successfully",
+          description: `Version ${nextVersion} saved.`,
+        });
+      }
     } catch (error) {
       toast({
         title: "Enhancement failed",
@@ -375,6 +634,27 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
     } finally {
       setIsEnhancing(false);
     }
+  };
+
+  const handleAcceptComparison = () => {
+    if (!compareAfterJD) return;
+    const nextVersion = (position.jd_versions?.length ?? 0) + 1;
+    onJDSaved(compareAfterJD, nextVersion);
+    setSelectedVersionId(nextVersion);
+    setCompareBeforeJD(null);
+    setCompareAfterJD(null);
+    setJdText("");
+    setJdView("view");
+    toast({
+      title: "JD Enhanced successfully",
+      description: `Version ${nextVersion} saved.`,
+    });
+  };
+
+  const handleDiscardComparison = () => {
+    setCompareBeforeJD(null);
+    setCompareAfterJD(null);
+    setJdView("paste");
   };
 
   const handleEnhanceFullJD = async () => {
@@ -400,8 +680,6 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
       setIsEnhancing(false);
     }
   };
-
-  // (Removed Upload Logic entirelly)
 
   const handleFileUploadHeader = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -429,7 +707,6 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
           });
         } finally {
           setIsEnhancing(false);
-          // Reset the input so the same file can be selected again if needed
           e.target.value = '';
         }
       }
@@ -468,7 +745,58 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
 
   // No JD — show choice or paste view
   if (!displayJD || jdView !== "view") {
+
+    // ── COMPARISON VIEW ─────────────────────────────────────────────────────
+    if (jdView === "compare" && compareBeforeJD && compareAfterJD) {
+      return (
+        <div className="space-y-4">
+          <Card className="glass-strong">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-bold text-foreground font-display">Review Changes</h3>
+                  <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/5 ml-1">Before / After</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">Drag the slider to compare the original vs enhanced JD</p>
+              </div>
+
+              <JDComparisonSlider
+                beforeLabel={`v${enhanceBaseVersionId ?? selectedVersionId} · Original`}
+                afterLabel="New · Enhanced"
+                beforeContent={<JDContentCard jd={compareBeforeJD} compareWith={compareAfterJD} side="before" />}
+                afterContent={<JDContentCard jd={compareAfterJD} compareWith={compareBeforeJD} side="after" />}
+              />
+
+              <div className="flex items-center justify-end gap-3 mt-5 pt-4 border-t border-border/30">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleDiscardComparison} 
+                  className="border-destructive/30 text-destructive hover:bg-destructive/10"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Discard
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleAcceptComparison}
+                  className="gradient-primary text-primary-foreground font-semibold rounded-lg hover:opacity-90 min-w-[160px]"
+                >
+                  <Sparkles className="h-4 w-4 mr-1" />
+                  Accept & Save as v{(position.jd_versions?.length ?? 0) + 1}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    // ── PASTE / ENHANCE EXISTING JD VIEW ─────────────────────────────────────
     if (jdView === "paste") {
+      const hasVersions = position.jd_versions && position.jd_versions.length > 0;
+
       return (
         <Card className="glass-strong">
           <CardContent className="p-6 space-y-4">
@@ -476,9 +804,32 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
               <Edit3 className="h-4 w-4 text-primary" />
               <h3 className="text-sm font-semibold text-foreground font-display">{displayJD ? "Enhance Existing JD" : "Paste & Enhance Job Description"}</h3>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
+
+            {/* VERSION SELECTOR — only when modifying an existing JD */}
+            {displayJD && hasVersions && (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40">
+                <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">Base Version:</label>
+                <select
+                  value={enhanceBaseVersionId ?? selectedVersionId}
+                  onChange={(e) => setEnhanceBaseVersionId(Number(e.target.value))}
+                  className="flex-1 max-w-[240px] text-sm bg-background/70 border border-border/50 rounded-lg px-3 py-1.5 text-foreground outline-none focus:border-primary transition-colors cursor-pointer"
+                  disabled={isEnhancing}
+                >
+                  {position.jd_versions!.map((v) => (
+                    <option key={v.version} value={v.version}>
+                      Version {v.version} — {new Date(v.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-muted-foreground/70">
+                  Select which version the AI should modify
+                </span>
+              </div>
+            )}
+
+            <p className="text-sm text-muted-foreground">
               {displayJD 
-                ? "Provide specific instructions to modify the current Job Description. Example: 'Change the experience level to fresher (0-1 years) and add Python to the skills.' The AI will keep the rest of your beautiful JD intact." 
+                ? "Provide specific instructions to modify the selected version. Example: 'Change the experience level to fresher (0-1 years) and add Python to the skills.' The AI will keep the rest of your beautiful JD intact." 
                 : "Paste your raw constraints, notes, or poorly formatted job description here. Our AI will automatically structure and enhance it into a professional format."}
             </p>
             <Textarea
@@ -489,7 +840,7 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
               disabled={isEnhancing}
             />
             <div className="flex items-center justify-end gap-3">
-              <Button variant="ghost" onClick={() => setJdView(position.jd ? "view" : "choice")} disabled={isEnhancing}>Back</Button>
+              <Button variant="ghost" onClick={() => { setJdView(position.jd ? "view" : "choice"); setEnhanceBaseVersionId(null); }} disabled={isEnhancing}>Back</Button>
               <Button
                 onClick={handleSaveJD}
                 disabled={!jdText.trim() || isEnhancing}
@@ -503,7 +854,7 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4 mr-1" />
-                    Generate & Save
+                    Generate & Compare
                   </>
                 )}
               </Button>
@@ -740,150 +1091,6 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
         </CardContent>
       </Card>
       </div>
-    </div>
-  );
-}
-
-
-//  EOS-IA Psychometrics Tab 
-interface PsychometricsTabProps {
-  position: import("@/types/api").ApiPosition;
-  psychProfile: import("@/types/psychometric").PsychometricProfile | null;
-  psychProfileLoading: boolean;
-  onLoadProfile: () => void;
-  onGenerateProfile: () => void;
-  selectedCandidate: { id: string; name: string } | null;
-  fitmentReports: Record<string, import("@/types/psychometric").FitmentReport>;
-  onOpenScoring: (candidateId: string, candidateName: string) => void;
-  onClearSelectedCandidate: () => void;
-}
-
-function PsychometricsTab({
-  position, psychProfile, psychProfileLoading,
-  onLoadProfile, onGenerateProfile,
-  selectedCandidate, fitmentReports, onOpenScoring, onClearSelectedCandidate,
-}: PsychometricsTabProps) {
-  const hasJD = !!position.jd;
-
-  return (
-    <div className="space-y-6">
-      {/* Psychometric Profile Card */}
-      <Card className="glass-strong overflow-hidden">
-        <CardContent className="p-0">
-          <div className="flex items-center justify-between p-5 border-b border-border/20">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-primary">
-                <Brain className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-foreground font-display">EOS-IA Psychometric Profile</h3>
-                <p className="text-xs text-muted-foreground">Role-calibrated from JD</p>
-              </div>
-            </div>
-            {!psychProfile && (
-              <Button
-                onClick={hasJD ? onGenerateProfile : undefined}
-                disabled={!hasJD || psychProfileLoading}
-                className="gradient-primary text-primary-foreground text-xs rounded-xl"
-                size="sm"
-              >
-                {psychProfileLoading ? (
-                  <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Generating...</>
-                ) : (
-                  <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Generate Profile</>
-                )}
-              </Button>
-            )}
-            {psychProfile && (
-              <Button variant="outline" size="sm" onClick={onGenerateProfile} disabled={psychProfileLoading} className="text-xs border-border/50">
-                {psychProfileLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
-                Re-generate
-              </Button>
-            )}
-          </div>
-
-          {!hasJD && (
-            <div className="p-8 text-center text-muted-foreground text-sm">
-              Save a JD first to generate the psychometric profile.
-            </div>
-          )}
-
-          {hasJD && !psychProfile && !psychProfileLoading && (
-            <div className="p-8 text-center">
-              <Brain className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-              <p className="text-foreground font-semibold text-sm">No profile yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Click "Generate Profile" to create role-calibrated psychometric questions.</p>
-            </div>
-          )}
-
-          {psychProfileLoading && !psychProfile && (
-            <div className="flex items-center justify-center py-10 gap-3 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-sm">Analysing JD and generating role-specific psychometric questions...</span>
-            </div>
-          )}
-
-          {psychProfile && (
-            <div className="p-5 space-y-4">
-              {/* Context badges */}
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="text-xs border-primary/30 text-primary bg-primary/10">{psychProfile.role_type}</Badge>
-                <Badge variant="outline" className="text-xs border-border/50 text-muted-foreground">{psychProfile.business_model}</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">{psychProfile.company_context}</p>
-
-              {/* Key Stressors */}
-              <div>
-                <p className="text-xs font-semibold text-foreground mb-2">Key Role Stressors</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {psychProfile.key_stressors.map(s => (
-                    <span key={s} className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 rounded-md px-2 py-0.5">{s}</span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Questions */}
-              <div>
-                <p className="text-xs font-semibold text-foreground mb-3">Role-Calibrated Psychometric Questions ({psychProfile.required_traits.length})</p>
-                <div className="space-y-3">
-                  {psychProfile.required_traits.map((t, i) => (
-                    <div key={t.trait} className="p-3 rounded-xl border border-border/30 bg-muted/20">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-[10px] font-mono text-primary bg-primary/10 rounded px-1.5 py-0.5">Q{i+1}</span>
-                        <span className="text-xs font-semibold text-foreground">{t.trait}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed italic">"{t.question}"</p>
-                      <p className="text-[10px] text-muted-foreground/70 mt-1.5">{t.why_important}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Fitment Report for selected candidate */}
-      {selectedCandidate && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">{selectedCandidate.name} — Fitment Report</span>
-            </div>
-            <Button variant="ghost" size="sm" onClick={onClearSelectedCandidate} className="text-xs text-muted-foreground">
-              <X className="h-3.5 w-3.5 mr-1" /> Close
-            </Button>
-          </div>
-          <FitmentReportPanel
-            candidateId={selectedCandidate.id}
-            candidateName={selectedCandidate.name}
-            positionId={position.id}
-            initialReport={fitmentReports[selectedCandidate.id] ?? null}
-            onOpenScoring={() => onOpenScoring(selectedCandidate.id, selectedCandidate.name)}
-          />
-        </div>
-      )}
     </div>
   );
 }

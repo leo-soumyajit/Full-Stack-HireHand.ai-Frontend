@@ -124,3 +124,47 @@ export const candidatesApi = {
   delete: (candidateId: string) =>
     apiFetch<void>(`/api/positions/candidates/${candidateId}`, { method: 'DELETE' }),
 };
+
+// ── Assessment Portal ──────────────────────────────────────────────────────
+
+export const assessmentApi = {
+  generate: (body: { position_id: string; time_limit_minutes: number; num_questions: number }) =>
+    apiFetch<{ message: string }>('/api/assessment/generate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  getPositionTest: (positionId: string) =>
+    apiFetch<any>(`/api/assessment/position/${positionId}`),
+
+  clearPositionTest: (positionId: string) =>
+    apiFetch<{ message: string }>(`/api/assessment/position/${positionId}`, {
+      method: 'DELETE',
+    }),
+
+  updateQuestion: (positionId: string, questionId: string, body: { scenario: string; options: any[] }) =>
+    apiFetch<{ message: string }>(`/api/assessment/position/${positionId}/questions/${questionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteQuestion: (positionId: string, questionId: string) =>
+    apiFetch<{ message: string }>(`/api/assessment/position/${positionId}/questions/${questionId}`, {
+      method: 'DELETE',
+    }),
+
+  send: (body: { position_id: string; candidate_id: string }) =>
+    apiFetch<{ message: string; url: string }>('/api/assessment/send', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  getTest: (token: string) =>
+    apiFetch<any>(`/api/assessment/${token}`),
+
+  submit: (token: string, body: { responses: any[]; total_time_spent_ms: number }) =>
+    apiFetch<{ message: string }>(`/api/assessment/${token}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+};
