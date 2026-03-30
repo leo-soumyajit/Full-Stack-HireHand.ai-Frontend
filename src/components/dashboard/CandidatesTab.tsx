@@ -71,7 +71,10 @@ const STAGE_COLORS: Record<string, string> = {
 const VERDICT_COLORS: Record<string, string> = {
   "Go": "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   "Conditional": "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+  "CONDITIONAL GO": "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
   "No-Go": "bg-red-500/15 text-red-400 border-red-500/30",
+  "NO-GO": "bg-red-500/15 text-red-400 border-red-500/30",
+  "Pending": "bg-slate-500/15 text-slate-400 border-slate-500/30",
 };
 
 function getInitials(name: string) {
@@ -247,11 +250,11 @@ export function CandidatesTab({
     // Optimistic update
     setCandidates((prev) =>
       prev.map((c) =>
-        c.id === candidateId ? { ...c, stage: "Sourced", verdict: "Conditional" } : c
+        c.id === candidateId ? { ...c, stage: "Sourced", verdict: "Pending" } : c
       )
     );
     try {
-      await candidatesApi.update(candidateId, { stage: "Sourced", verdict: "Conditional" });
+      await candidatesApi.update(candidateId, { stage: "Sourced", verdict: "Pending" });
       toast({ title: "Rejection reverted" });
     } catch (err) {
       await loadCandidates();
@@ -333,7 +336,7 @@ export function CandidatesTab({
           </span>
         </TableCell>
         <TableCell className="hidden lg:table-cell">
-          <Badge variant="outline" className={`text-xs ${isRejectedList && !isManuallyRejected ? VERDICT_COLORS["No-Go"] : (VERDICT_COLORS[displayVerdict] || VERDICT_COLORS["Conditional"])}`}>
+          <Badge variant="outline" className={`text-xs ${isRejectedList && !isManuallyRejected ? VERDICT_COLORS["No-Go"] : (VERDICT_COLORS[displayVerdict] || VERDICT_COLORS["Pending"])}`}>
             {displayVerdict}
           </Badge>
         </TableCell>

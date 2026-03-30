@@ -31,7 +31,10 @@ const STAGE_COLORS: Record<string, string> = {
 const VERDICT_COLORS: Record<string, string> = {
   "Go": "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   "Conditional": "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+  "CONDITIONAL GO": "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
   "No-Go": "bg-red-500/15 text-red-400 border-red-500/30",
+  "NO-GO": "bg-red-500/15 text-red-400 border-red-500/30",
+  "Pending": "bg-slate-500/15 text-slate-400 border-slate-500/30",
 };
 
 function getInitials(name: string) {
@@ -140,7 +143,7 @@ export function AllCandidatesView() {
                       <p className="text-xs text-muted-foreground truncate">{c.role} · {c.positionTitle}</p>
                     </div>
                     <Badge variant="outline" className={`text-xs hidden sm:flex ${STAGE_COLORS[c.stage] || STAGE_COLORS["Sourced"]}`}>{c.stage}</Badge>
-                    <Badge variant="outline" className={`text-xs ${VERDICT_COLORS[c.verdict] || VERDICT_COLORS["Conditional"]}`}>{c.verdict}</Badge>
+                    <Badge variant="outline" className={`text-xs ${VERDICT_COLORS[c.verdict] || VERDICT_COLORS["Pending"]}`}>{c.verdict}</Badge>
                     <span className={`text-sm font-bold hidden md:inline ${c.scores.composite >= 85 ? "text-emerald-400" : c.scores.composite >= 70 ? "text-yellow-400" : "text-red-400"}`}>{c.scores.composite}%</span>
                   </div>
                 ))
@@ -210,7 +213,7 @@ export function AllCandidatesView() {
                           <p className="text-xs text-muted-foreground truncate">{c.role}</p>
                         </div>
                         <Badge variant="outline" className={`text-xs hidden sm:flex ${STAGE_COLORS[c.stage] || STAGE_COLORS["Sourced"]}`}>{c.stage}</Badge>
-                        <Badge variant="outline" className={`text-xs ${VERDICT_COLORS[c.verdict] || VERDICT_COLORS["Conditional"]}`}>{c.verdict}</Badge>
+                        <Badge variant="outline" className={`text-xs ${VERDICT_COLORS[c.verdict] || VERDICT_COLORS["Pending"]}`}>{c.verdict}</Badge>
                         <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground shrink-0">
                           <span className="font-mono">R:{c.scores.resume.toFixed(1)}</span>
                           <span className="font-mono">P:{c.scores.psych.toFixed(1)}</span>

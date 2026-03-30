@@ -128,7 +128,7 @@ export const candidatesApi = {
 // ── Assessment Portal ──────────────────────────────────────────────────────
 
 export const assessmentApi = {
-  generate: (body: { position_id: string; time_limit_minutes: number; num_questions: number }) =>
+  generate: (body: { position_id: string; time_limit_minutes: number; num_questions: number; question_type?: string; distribution?: Record<string, number> }) =>
     apiFetch<{ message: string }>('/api/assessment/generate', {
       method: 'POST',
       body: JSON.stringify(body),

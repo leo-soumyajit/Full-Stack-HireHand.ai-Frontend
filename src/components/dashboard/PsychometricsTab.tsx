@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Brain, Sparkles, Loader2, RefreshCw, X, Users, Trash2, Edit3, CheckCircle2, FileVideo, Clock, Send, AlertTriangle } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Brain, Sparkles, Loader2, RefreshCw, X, Users, Trash2, Edit3, CheckCircle2, FileVideo, Clock, Send, AlertTriangle, Layers, Shuffle, ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,23 @@ import { assessmentApi, candidatesApi } from "@/lib/api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
+const QUESTION_TYPES = [
+  { id: "Scenario", label: "Scenario-Based", icon: "🎭", desc: "Realistic workplace situations with behavioral choices", color: "text-violet-400 bg-violet-500/10 border-violet-500/20" },
+  { id: "Conventional", label: "Conventional", icon: "📋", desc: "Direct personality & work-style preference questions", color: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+  { id: "Math & Aptitude", label: "Math & Aptitude", icon: "🧮", desc: "Numerical reasoning, logic puzzles & analytical problems", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+  { id: "Behavioral", label: "Behavioral", icon: "🧠", desc: "\"How would you handle...\" style behavioral MCQs", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+  { id: "Logical Reasoning", label: "Logical Reasoning", icon: "🧩", desc: "Deductive logic, syllogisms, pattern sequences & argument evaluation", color: "text-cyan-400 bg-cyan-500/10 border-cyan-500/20" },
+  { id: "Hybrid", label: "Hybrid Mix", icon: "🔀", desc: "Custom mix — control how many of each type", color: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
+] as const;
+
+const HYBRID_CATEGORIES = [
+  { key: "Scenario", label: "Scenario-Based", emoji: "🎭", color: "bg-violet-500" },
+  { key: "Conventional", label: "Conventional", emoji: "📋", color: "bg-blue-500" },
+  { key: "Math & Aptitude", label: "Math & Aptitude", emoji: "🧮", color: "bg-emerald-500" },
+  { key: "Behavioral", label: "Behavioral", emoji: "🧠", color: "bg-amber-500" },
+  { key: "Logical Reasoning", label: "Logical Reasoning", emoji: "🧩", color: "bg-cyan-500" },
+] as const;
+
 interface PsychometricsTabProps {
   position: import("@/types/api").ApiPosition;
   fitmentReports: Record<string, import("@/types/psychometric").FitmentReport>;
@@ -36,6 +53,14 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
   const [showConfig, setShowConfig] = useState(false);
   const [timeLimit, setTimeLimit] = useState(15);
   const [numQuestions, setNumQuestions] = useState(10);
+  const [questionType, setQuestionType] = useState<string>("Scenario");
+  const [hybridDist, setHybridDist] = useState<Record<string, number>>({
+    "Scenario": 3,
+    "Conventional": 2,
+    "Math & Aptitude": 2,
+    "Behavioral": 2,
+    "Logical Reasoning": 1,
+  });
   
   // Edit Question State
   const [editingQId, setEditingQId] = useState<string | null>(null);
@@ -50,10 +75,18 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
 
   const hasJD = !!position.jd;
 
+  // Auto-sync hybrid total with numQuestions
+  const hybridTotal = useMemo(() => Object.values(hybridDist).reduce((a, b) => a + b, 0), [hybridDist]);
+  
+  useEffect(() => {
+    if (questionType === "Hybrid") {
+      setNumQuestions(hybridTotal);
+    }
+  }, [hybridTotal, questionType]);
+
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // 1. Load Test
       try {
         const testData = await assessmentApi.getPositionTest(position.id);
         setTest(testData);
@@ -63,10 +96,7 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
         }
         setTest(null);
       }
-      
-      // 2. Load Candidates
       const cands = await candidatesApi.list(position.id);
-      // Filter out rejected ones or keep them. Let's show only active/shortlisted ones
       const activeCands = cands.filter((c: any) => c.stage !== "Rejected" && c.verdict !== "No-Go");
       setCandidates(activeCands);
     } catch (err) {
@@ -83,12 +113,17 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
   const handleGenerateTest = async () => {
     setIsGenerating(true);
     try {
-      await assessmentApi.generate({
+      const payload: any = {
         position_id: position.id,
         time_limit_minutes: timeLimit,
-        num_questions: numQuestions
-      });
-      toast({ title: "Assessment Generated", description: "The AI has created the MCQs successfully." });
+        num_questions: numQuestions,
+        question_type: questionType,
+      };
+      if (questionType === "Hybrid") {
+        payload.distribution = hybridDist;
+      }
+      await assessmentApi.generate(payload);
+      toast({ title: "Assessment Generated", description: `${numQuestions} ${questionType} questions created successfully.` });
       setShowConfig(false);
       await loadData();
     } catch (err: any) {
@@ -124,7 +159,7 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
   const startEdit = (q: any) => {
     setEditingQId(q.id);
     setEditScenario(q.scenario);
-    setEditOptions(JSON.parse(JSON.stringify(q.options))); // deep copy
+    setEditOptions(JSON.parse(JSON.stringify(q.options)));
   };
 
   const handleSaveEdit = async () => {
@@ -162,7 +197,6 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
 
   const handleDispatchAll = async () => {
     const eligibleCandidates = candidates.filter(c => {
-      // Don't send if they already have psych score > 0 or a generated report
       return !(fitmentReports[c.id] || (c.scores && c.scores.psych > 0));
     });
 
@@ -174,7 +208,6 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
     setIsDispatchingAll(true);
     let successCount = 0;
     
-    // Asynchronous Concurrent Dispatch Mapping
     await Promise.allSettled(
       eligibleCandidates.map(async (c) => {
         setSendingStates(prev => ({ ...prev, [c.id]: true }));
@@ -206,6 +239,10 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
 
   const getInitials = (name: string) => name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 
+  const updateHybridDist = (key: string, value: number) => {
+    setHybridDist(prev => ({ ...prev, [key]: Math.max(0, Math.min(20, value)) }));
+  };
+
   return (
     <div className="space-y-6">
         {/* HEADER CARD */}
@@ -218,7 +255,7 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
               </div>
               <div>
                 <h3 className="text-sm font-bold text-foreground font-display">EOS-IA Final Assessment Interface</h3>
-                <p className="text-xs text-muted-foreground">Scenario-based behavioral MCQ Test</p>
+                <p className="text-xs text-muted-foreground">Pro-configurable psychometric MCQ engine</p>
               </div>
             </div>
           </div>
@@ -233,46 +270,165 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
             <div className="p-12 text-center flex flex-col items-center justify-center">
               <Brain className="h-12 w-12 text-muted-foreground opacity-50 mb-3" />
               <p className="text-foreground font-semibold text-lg max-w-sm leading-tight mb-2">Configure & Generate Assessment Test</p>
-              <p className="text-xs text-muted-foreground max-w-sm mb-6">Create the role-specific scenario test before sending it to candidates.</p>
+              <p className="text-xs text-muted-foreground max-w-sm mb-6">Create the role-specific test with full control over question types, difficulty distribution, and time limits.</p>
               <Button onClick={() => setShowConfig(true)} className="gradient-primary text-primary-foreground px-8 shadow-lg shadow-indigo-500/20 rounded-full h-10">
                 <Sparkles className="h-4 w-4 mr-2" /> Start Generation Setup
               </Button>
             </div>
           )}
 
+          {/* ── PRO GENERATION SETTINGS ─────────────────────────────────────── */}
           {hasJD && !test && showConfig && (
-            <div className="p-8 max-w-md mx-auto relative">
-               <div className="space-y-5">
-                 <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-semibold text-foreground">Generation Settings</h4>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full" onClick={() => setShowConfig(false)}><X className="h-4 w-4"/></Button>
-                 </div>
-                 
-                 <div className="space-y-3">
-                   <Label className="text-xs font-semibold text-foreground flex items-center gap-2">
-                     <Clock className="w-3.5 h-3.5 text-orange-400" /> Time Limit (Minutes)
-                   </Label>
-                   <Input 
-                     type="number" min={5} max={60} value={timeLimit} 
-                     onChange={e => setTimeLimit(Number(e.target.value))}
-                     className="bg-background max-w-[120px]"
-                   />
+            <div className="p-6 max-w-2xl mx-auto relative">
+               <div className="space-y-6">
+                 <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="font-bold text-foreground text-lg font-display">Generation Settings</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">Full control over your assessment configuration</p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full" onClick={() => setShowConfig(false)}><X className="h-4 w-4"/></Button>
                  </div>
 
-                 <div className="space-y-3">
-                   <Label className="text-xs font-semibold text-foreground flex items-center gap-2">
-                     <FileVideo className="w-3.5 h-3.5 text-indigo-400" /> Number of Questions
-                   </Label>
-                   <Input 
-                     type="number" min={5} max={20} value={numQuestions} 
-                     onChange={e => setNumQuestions(Number(e.target.value))}
-                     className="bg-background max-w-[120px]"
-                   />
+                 {/* Row 1: Time + Question Count */}
+                 <div className="grid grid-cols-2 gap-4">
+                   <div className="space-y-2 p-4 rounded-xl border border-border/40 bg-muted/10">
+                     <Label className="text-xs font-semibold text-foreground flex items-center gap-2">
+                       <Clock className="w-3.5 h-3.5 text-orange-400" /> Time Limit (Minutes)
+                     </Label>
+                     <Input 
+                       type="number" min={5} max={60} value={timeLimit} 
+                       onChange={e => setTimeLimit(Number(e.target.value))}
+                       className="bg-background"
+                     />
+                   </div>
+
+                   <div className="space-y-2 p-4 rounded-xl border border-border/40 bg-muted/10">
+                     <Label className="text-xs font-semibold text-foreground flex items-center gap-2">
+                       <Layers className="w-3.5 h-3.5 text-indigo-400" /> Total Questions
+                     </Label>
+                     <Input 
+                       type="number" min={5} max={25} value={numQuestions} 
+                       onChange={e => setNumQuestions(Number(e.target.value))}
+                       className="bg-background"
+                       disabled={questionType === "Hybrid"}
+                     />
+                     {questionType === "Hybrid" && (
+                       <p className="text-[10px] text-muted-foreground">Auto-calculated from distribution below</p>
+                     )}
+                   </div>
                  </div>
 
-                 <div className="pt-4 flex justify-end">
-                   <Button onClick={handleGenerateTest} disabled={isGenerating} className="gradient-primary text-primary-foreground font-semibold w-full">
-                     {isGenerating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin"/> Generating Scenarios...</> : <><Sparkles className="w-4 h-4 mr-2"/> Generate Test Scenarios</>}
+                 {/* Row 2: Question Type Selection */}
+                 <div className="space-y-3">
+                   <Label className="text-xs font-bold text-foreground flex items-center gap-2 uppercase tracking-wider">
+                     <BarChart3 className="w-3.5 h-3.5 text-primary" /> Question Type
+                   </Label>
+                   <div className="grid grid-cols-1 gap-2">
+                     {QUESTION_TYPES.map(qt => (
+                       <button
+                         key={qt.id}
+                         onClick={() => setQuestionType(qt.id)}
+                         className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left group ${
+                           questionType === qt.id
+                             ? `${qt.color} border-current shadow-sm`
+                             : "border-border/40 bg-background/30 hover:border-border/80 hover:bg-muted/20"
+                         }`}
+                       >
+                         <span className="text-xl flex-shrink-0">{qt.icon}</span>
+                         <div className="flex-1 min-w-0">
+                           <p className={`text-sm font-semibold ${questionType === qt.id ? "" : "text-foreground"}`}>{qt.label}</p>
+                           <p className={`text-[11px] leading-relaxed ${questionType === qt.id ? "opacity-80" : "text-muted-foreground"}`}>{qt.desc}</p>
+                         </div>
+                         {questionType === qt.id && (
+                           <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                         )}
+                       </button>
+                     ))}
+                   </div>
+                 </div>
+
+                 {/* Row 3: Hybrid Distribution (Only when Hybrid selected) */}
+                 {questionType === "Hybrid" && (
+                   <div className="space-y-3 p-4 rounded-xl border border-pink-500/20 bg-pink-500/5">
+                     <div className="flex items-center justify-between">
+                       <Label className="text-xs font-bold text-pink-400 flex items-center gap-2 uppercase tracking-wider">
+                         <Shuffle className="w-3.5 h-3.5" /> Distribution Control
+                       </Label>
+                       <Badge variant="outline" className={`text-xs font-mono ${hybridTotal === 0 ? "text-red-400 border-red-500/30" : "text-pink-400 border-pink-500/30"}`}>
+                         Total: {hybridTotal} Questions
+                       </Badge>
+                     </div>
+                     <p className="text-[11px] text-muted-foreground">Set how many questions of each type you want in the hybrid mix.</p>
+                     
+                     <div className="space-y-3 pt-2">
+                       {HYBRID_CATEGORIES.map(cat => (
+                         <div key={cat.key} className="flex items-center gap-3">
+                           <span className="text-base">{cat.emoji}</span>
+                           <span className="text-xs font-medium text-foreground w-28 truncate">{cat.label}</span>
+                           <div className="flex-1 flex items-center gap-2">
+                             <input
+                               type="range"
+                               min={0}
+                               max={15}
+                               value={hybridDist[cat.key] || 0}
+                               onChange={e => updateHybridDist(cat.key, Number(e.target.value))}
+                               className="flex-1 h-2 rounded-lg appearance-none cursor-pointer accent-primary"
+                               style={{ accentColor: "hsl(var(--primary))" }}
+                             />
+                             <Input
+                               type="number"
+                               min={0}
+                               max={15}
+                               value={hybridDist[cat.key] || 0}
+                               onChange={e => updateHybridDist(cat.key, Number(e.target.value))}
+                               className="w-16 h-8 text-center text-xs bg-background"
+                             />
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+
+                     {/* Visual Distribution Bar */}
+                     {hybridTotal > 0 && (
+                       <div className="flex h-3 rounded-full overflow-hidden mt-3 border border-border/30">
+                         {HYBRID_CATEGORIES.map(cat => {
+                           const pct = ((hybridDist[cat.key] || 0) / hybridTotal) * 100;
+                           if (pct === 0) return null;
+                           return (
+                             <div
+                               key={cat.key}
+                               className={`${cat.color} transition-all duration-300`}
+                               style={{ width: `${pct}%` }}
+                               title={`${cat.label}: ${hybridDist[cat.key]} (${pct.toFixed(0)}%)`}
+                             />
+                           );
+                         })}
+                       </div>
+                     )}
+                   </div>
+                 )}
+
+                 {/* Summary + Generate */}
+                 <div className="flex flex-col gap-4 pt-2">
+                   {/* Summary Badges */}
+                   <div className="flex flex-wrap gap-2 p-3 rounded-xl bg-muted/20 border border-border/30">
+                     <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/20 text-[11px]">
+                       <Clock className="w-3 h-3 mr-1" /> {timeLimit} min
+                     </Badge>
+                     <Badge variant="outline" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-[11px]">
+                       <Layers className="w-3 h-3 mr-1" /> {numQuestions} questions
+                     </Badge>
+                     <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[11px]">
+                       {QUESTION_TYPES.find(t => t.id === questionType)?.icon} {questionType}
+                     </Badge>
+                   </div>
+
+                   <Button 
+                     onClick={handleGenerateTest} 
+                     disabled={isGenerating || (questionType === "Hybrid" && hybridTotal === 0)} 
+                     className="gradient-primary text-primary-foreground font-semibold w-full h-12 text-sm rounded-xl shadow-lg shadow-indigo-500/20"
+                   >
+                     {isGenerating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin"/> Generating {questionType} Scenarios...</> : <><Sparkles className="w-4 h-4 mr-2"/> Generate Test ({numQuestions} Questions)</>}
                    </Button>
                  </div>
                </div>
