@@ -42,13 +42,11 @@ export default function CandidateAssessment() {
   const [isCompleted, setIsCompleted] = useState(false);
   
   const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [responses, setResponses] = useState<QuestionResponse[]>([]);
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [responses, setResponses] = useState<Record<string, { option_idx: number; time_spent_ms: number }>>({});
   
   // Timers & Behavioral Tracking
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [questionStartTime, setQuestionStartTime] = useState<number>(0);
-  const [totalTimeSpent, setTotalTimeSpent] = useState<number>(0);
   const globalStartRef = useRef<number>(0);
 
   // Fetch test data on mount
@@ -97,35 +95,90 @@ export default function CandidateAssessment() {
     setQuestionStartTime(Date.now());
   };
 
-  const handleNext = () => {
-    if (!selectedOption || !testData) return;
-
-    const timeSpent = Date.now() - questionStartTime;
+  const recordQuestionTime = () => {
+    if (!testData || currentQIndex >= testData.questions.length) return;
     const currentQ = testData.questions[currentQIndex];
+    const timeSpent = Date.now() - questionStartTime;
+    
+    setResponses((prev) => {
+      const existing = prev[currentQ.id];
+      return {
+        ...prev,
+        [currentQ.id]: {
+          option_idx: existing?.option_idx ?? -1,
+          time_spent_ms: (existing?.time_spent_ms || 0) + timeSpent,
+        },
+      };
+    });
+  };
 
-    const newResponse: QuestionResponse = {
-      question_id: currentQ.id,
-      selected_option_id: selectedOption,
-      time_spent_ms: timeSpent
-    };
+  const handleNext = () => {
+    if (!testData) return;
+    recordQuestionTime();
+    setCurrentQIndex(prev => prev + 1);
+    setQuestionStartTime(Date.now());
+  };
 
-    setResponses(prev => [...prev, newResponse]);
-    setTotalTimeSpent(prev => prev + timeSpent);
-    setSelectedOption(null);
+  const handlePrev = () => {
+    if (!testData || currentQIndex === 0) return;
+    recordQuestionTime();
+    setCurrentQIndex(prev => prev - 1);
+    setQuestionStartTime(Date.now());
+  };
 
-    if (currentQIndex < testData.questions.length - 1) {
-      setCurrentQIndex(prev => prev + 1);
-      setQuestionStartTime(Date.now());
-    } else {
-      // It was the last question
-      void handleSubmit([...responses, newResponse], totalTimeSpent + timeSpent);
+  const handleSelectOption = (optIdx: number) => {
+    if (!testData || currentQIndex >= testData.questions.length) return;
+    const currentQ = testData.questions[currentQIndex];
+    
+    setResponses(prev => ({
+      ...prev,
+      [currentQ.id]: {
+        option_idx: optIdx,
+        time_spent_ms: prev[currentQ.id]?.time_spent_ms || 0
+      }
+    }));
+  };
+
+  const jumpToQuestion = (index: number) => {
+    if (currentQIndex < (testData?.questions.length || 0)) {
+        recordQuestionTime();
     }
+    setCurrentQIndex(index);
+    setQuestionStartTime(Date.now());
+  };
+
+  const prepareSubmit = async () => {
+    if (!testData) return;
+    
+    let currentResponses = { ...responses };
+    if (currentQIndex < testData.questions.length) {
+       const currentQ = testData.questions[currentQIndex];
+       const timeSpent = Date.now() - questionStartTime;
+       const existing = currentResponses[currentQ.id];
+       currentResponses[currentQ.id] = {
+          option_idx: existing?.option_idx ?? -1,
+          time_spent_ms: (existing?.time_spent_ms || 0) + timeSpent,
+       };
+    }
+
+    const finalResponses: QuestionResponse[] = testData.questions
+       .filter(q => currentResponses[q.id] && currentResponses[q.id].option_idx !== -1)
+       .map(q => {
+          const rec = currentResponses[q.id];
+          const badgeId = ["A", "B", "C", "D"][rec.option_idx];
+          return {
+             question_id: q.id,
+             selected_option_id: badgeId || "A",
+             time_spent_ms: rec.time_spent_ms
+          };
+       });
+       
+    await handleSubmit(finalResponses, Date.now() - globalStartRef.current);
   };
 
   const handleAutoSubmit = () => {
     toast({ title: "Time's Up!", description: "Submitting your assessment...", variant: "destructive" });
-    // If they were lingering on a question, we don't count it as a clean answer
-    void handleSubmit(responses, Date.now() - globalStartRef.current);
+    void prepareSubmit();
   };
 
   const handleSubmit = async (finalResponses: QuestionResponse[], totalMs: number) => {
@@ -245,9 +298,14 @@ export default function CandidateAssessment() {
     );
   }
 
-  const currentQ = testData.questions[currentQIndex];
-  const progress = ((currentQIndex) / testData.questions.length) * 100;
+  const isReviewScreen = currentQIndex === testData.questions.length;
+  const currentQ = isReviewScreen ? null : testData.questions[currentQIndex];
+  const progress = isReviewScreen ? 100 : ((currentQIndex) / testData.questions.length) * 100;
   const isTimeCritical = timeLeft < 60; // less than 1 min red
+  
+  // Calculate stats for review screen
+  const answeredCount = testData.questions.filter(q => responses[q.id] && responses[q.id].option_idx !== -1).length;
+  const missedCount = testData.questions.length - answeredCount;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -260,7 +318,9 @@ export default function CandidateAssessment() {
             </div>
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{testData.role_title}</p>
-              <p className="text-sm font-bold text-foreground">Question {currentQIndex + 1} of {testData.questions.length}</p>
+              <p className="text-sm font-bold text-foreground">
+                {isReviewScreen ? "Final Review" : `Question ${currentQIndex + 1} of ${testData.questions.length}`}
+              </p>
             </div>
           </div>
 
@@ -284,66 +344,121 @@ export default function CandidateAssessment() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col max-w-3xl mx-auto w-full p-6 sm:p-10">
         <AnimatePresence mode="wait">
-          <motion.div
-            key={currentQ.id}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="flex-1 space-y-10 py-6"
-          >
-            <div className="space-y-4">
-              <BadgeBox>Scenario</BadgeBox>
-              <h2 className="text-xl sm:text-2xl font-semibold text-foreground leading-relaxed">
-                {currentQ.scenario}
-              </h2>
-            </div>
+          {isReviewScreen ? (
+            <motion.div
+              key="review"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex-1 space-y-8 py-4"
+            >
+              <div className="text-center space-y-3">
+                <h2 className="text-2xl sm:text-3xl font-bold font-display text-foreground">Review Your Answers</h2>
+                <p className="text-muted-foreground text-sm">You can click on any question to go back and change your answer.</p>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
+                {testData.questions.map((q, idx) => {
+                  const isAnswered = responses[q.id] && responses[q.id].option_idx !== -1;
+                  return (
+                    <button
+                      key={q.id}
+                      onClick={() => jumpToQuestion(idx)}
+                      className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${
+                        isAnswered 
+                          ? 'border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10' 
+                          : 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10'
+                      }`}
+                    >
+                      <span className={`text-sm font-bold ${isAnswered ? 'text-emerald-500' : 'text-red-500'}`}>Q{idx + 1}</span>
+                      {isAnswered ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                      ) : (
+                        <span className="text-xs font-semibold text-red-500 bg-red-500/10 px-2 py-0.5 rounded uppercase">Missed</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ) : currentQ ? (
+            <motion.div
+              key={currentQ.id}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+              className="flex-1 space-y-10 py-6"
+            >
+              <div className="space-y-4">
+                <BadgeBox>Scenario</BadgeBox>
+                <h2 className="text-xl sm:text-2xl font-semibold text-foreground leading-relaxed">
+                  {currentQ.scenario}
+                </h2>
+              </div>
 
-            <div className="grid grid-cols-1 gap-3">
-              {currentQ.options.map((opt, i) => {
-                const isSelected = selectedOption === opt.id;
-                const badges = ["A", "B", "C", "D"];
-                return (
-                  <button
-                    key={opt.id}
-                    onClick={() => setSelectedOption(opt.id)}
-                    className={`group relative text-left p-5 sm:p-6 rounded-2xl border-2 transition-all duration-200 overflow-hidden flex gap-4 ${
-                      isSelected 
-                        ? 'bg-indigo-500/10 border-indigo-500 shadow-md shadow-indigo-500/5 glow-sm glow-indigo-500/10' 
-                        : 'bg-card border-border/50 hover:bg-muted/60 hover:border-border'
-                    }`}
-                  >
-                    <div className={`shrink-0 flex items-center justify-center w-8 h-8 rounded-lg text-sm font-bold transition-colors ${
-                      isSelected ? 'bg-indigo-500 text-white' : 'bg-muted text-muted-foreground group-hover:bg-muted-foreground/20 group-hover:text-foreground'
-                    }`}>
-                      {badges[i]}
-                    </div>
-                    <span className={`text-sm sm:text-base font-medium leading-relaxed ${isSelected ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>
-                      {opt.text}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </motion.div>
+              <div className="grid grid-cols-1 gap-3">
+                {currentQ.options.map((opt, i) => {
+                  const isSelected = responses[currentQ.id]?.option_idx === i;
+                  const badges = ["A", "B", "C", "D"];
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => handleSelectOption(i)}
+                      className={`group relative text-left p-5 sm:p-6 rounded-2xl border-2 transition-all duration-200 overflow-hidden flex gap-4 ${
+                        isSelected 
+                          ? 'bg-indigo-500/10 border-indigo-500 shadow-md shadow-indigo-500/5 glow-sm glow-indigo-500/10' 
+                          : 'bg-card border-border/50 hover:bg-muted/60 hover:border-border'
+                      }`}
+                    >
+                      <div className={`shrink-0 flex items-center justify-center w-8 h-8 rounded-lg text-sm font-bold transition-colors ${
+                        isSelected ? 'bg-indigo-500 text-white' : 'bg-muted text-muted-foreground group-hover:bg-muted-foreground/20 group-hover:text-foreground'
+                      }`}>
+                        {badges[i]}
+                      </div>
+                      <span className={`text-sm sm:text-base font-medium leading-relaxed ${isSelected ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>
+                        {opt.text}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </motion.div>
+          ) : null}
         </AnimatePresence>
 
         {/* Footer actions */}
-        <div className="pt-8 border-t border-border/40 flex justify-end">
+        <div className="pt-8 border-t border-border/40 flex items-center justify-between">
           <Button 
-            disabled={!selectedOption || isSubmitting}
-            onClick={handleNext}
-            size="lg"
-            className="min-w-[140px] font-semibold gradient-primary px-8"
+            variant="outline"
+            onClick={currentQIndex > 0 ? handlePrev : undefined}
+            disabled={isSubmitting || currentQIndex === 0}
+            className="w-[120px] border-border/50 hover:bg-muted/50"
           >
-            {isSubmitting ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : currentQIndex === testData.questions.length - 1 ? (
-              "Submit Assessment"
-            ) : (
-              "Next Scenario"
-            )}
+            Previous
           </Button>
+          
+          {isReviewScreen ? (
+            <Button 
+              onClick={prepareSubmit} 
+              disabled={isSubmitting}
+              size="lg"
+              className="min-w-[160px] font-semibold bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 px-8"
+            >
+              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <CheckCircle2 className="w-5 h-5 mr-2" />}
+              Final Submit
+            </Button>
+          ) : (
+            <Button 
+              disabled={isSubmitting}
+              onClick={handleNext}
+              size="lg"
+              className="min-w-[140px] font-semibold gradient-primary px-8"
+            >
+              {currentQIndex === testData.questions.length - 1 ? "Review Answers" : "Next Scenario"}
+            </Button>
+          )}
         </div>
       </main>
     </div>
