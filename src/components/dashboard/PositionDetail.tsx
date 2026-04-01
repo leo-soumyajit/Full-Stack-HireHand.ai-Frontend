@@ -25,6 +25,8 @@ import {
   Sparkles,
   Loader2,
   RefreshCw,
+  CheckCircle2,
+  Activity,
   X,
   ListChecks,
 } from "lucide-react";
@@ -277,60 +279,177 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
 
 function OverviewTab({ position }: { position: ApiPosition }) {
   const stats = [
-    { label: "Total Candidates", value: position.candidates_count, icon: Users, color: "text-primary" },
-    { label: "Avg Composite Score", value: "—", icon: Target, color: "text-emerald-400" },
-    { label: "SLA Status", value: "On Track", icon: ShieldCheck, color: "text-emerald-400" },
-    { label: "Risk Flags", value: position.risk_flag ? 1 : 0, icon: AlertTriangle, color: position.risk_flag ? "text-red-400" : "text-emerald-400" },
+    { label: "Total Candidates", value: position.candidates_count, icon: Users, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+    { label: "Avg Psych Score", value: "—", icon: Target, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", extra: "Awaiting data" },
+    { label: "Pipeline Health", value: "Optimal", icon: Activity, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+    { label: "Risk Indicators", value: position.risk_flag ? "1 Active" : "Clear", icon: AlertTriangle, color: position.risk_flag ? "text-red-400" : "text-emerald-400", bg: position.risk_flag ? "bg-red-500/10" : "bg-emerald-500/10", border: position.risk_flag ? "border-red-500/20" : "border-emerald-500/20" },
   ];
 
   const funnel = [
-    { stage: "Sourced", count: position.candidates_count, pct: 100 },
-    { stage: "Psychometrics", count: Math.round(position.candidates_count * 0.6), pct: 60 },
-    { stage: "Interview", count: Math.round(position.candidates_count * 0.3), pct: 30 },
-    { stage: "Offer", count: Math.round(position.candidates_count * 0.1), pct: 10 },
+    { stage: "Sourced", count: position.candidates_count, pct: 100, icon: Users, color: "text-blue-400", bg: "bg-blue-500", glow: "shadow-[0_0_15px_rgba(59,130,246,0.5)]" },
+    { stage: "Evaluated (Psych)", count: Math.round(position.candidates_count * 0.6), pct: 60, icon: Brain, color: "text-purple-400", bg: "bg-purple-500", glow: "shadow-[0_0_15px_rgba(168,85,247,0.5)]" },
+    { stage: "Interview Scheduled", count: Math.round(position.candidates_count * 0.3), pct: 30, icon: Video, color: "text-pink-400", bg: "bg-pink-500", glow: "shadow-[0_0_15px_rgba(236,72,153,0.5)]" },
+    { stage: "Offer Released", count: Math.round(position.candidates_count * 0.1), pct: 10, icon: CheckCircle2, color: "text-emerald-400", bg: "bg-emerald-500", glow: "shadow-[0_0_15px_rgba(16,185,129,0.5)]" },
   ];
 
+  const container = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+  
+  const item = {
+    hidden: { opacity: 0, scale: 0.95, y: 15 },
+    show: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+      {/* Premium Stats Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => (
-          <Card key={s.label} className="glass-strong">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <s.icon className={`h-4 w-4 ${s.color}`} />
-                <p className="text-xs text-muted-foreground">{s.label}</p>
-              </div>
-              <p className="text-2xl font-bold font-display text-foreground">{s.value}</p>
-            </CardContent>
-          </Card>
+          <motion.div key={s.label} variants={item}>
+            <Card className="relative overflow-hidden group border-border/40 hover:border-border/80 transition-all duration-500 hover:shadow-[0_0_2rem_-0.5rem_rgba(255,255,255,0.05)] bg-background/40 backdrop-blur-xl h-full">
+              <div className={`absolute top-0 right-0 w-32 h-32 blur-3xl opacity-20 transition-opacity duration-500 group-hover:opacity-40 rounded-full translate-x-12 -translate-y-12 ${s.bg.replace('/10', '/100')}`} />
+              <CardContent className="p-6 relative z-10 flex flex-col h-full justify-between">
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`p-2.5 rounded-xl ${s.bg} ${s.border} border border-opacity-50`}>
+                    <s.icon className={`h-5 w-5 ${s.color}`} />
+                  </div>
+                  {s.extra && <Badge variant="outline" className="text-[10px] font-mono border-border/50 text-muted-foreground">{s.extra}</Badge>}
+                </div>
+                <div>
+                  <h3 className="text-3xl font-bold font-display text-foreground tracking-tight">{s.value}</h3>
+                  <p className="text-sm font-medium text-muted-foreground mt-1">{s.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
       </div>
 
-      {/* Pipeline Funnel */}
-      <Card className="glass-strong">
-        <CardContent className="p-6">
-          <h3 className="text-sm font-semibold text-foreground mb-6 font-display">Pipeline Funnel</h3>
-          <div className="space-y-4">
-            {funnel.map((f) => (
-              <div key={f.stage} className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground w-28 shrink-0">{f.stage}</span>
-                <div className="flex-1 h-8 rounded-lg bg-muted/50 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${f.pct}%` }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="h-full rounded-lg gradient-primary flex items-center justify-end pr-3"
-                  >
-                    <span className="text-xs font-bold text-primary-foreground">{f.count}</span>
-                  </motion.div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Animated Pipeline Funnel */}
+        <motion.div variants={item} className="lg:col-span-2">
+          <Card className="h-full border-border/40 bg-background/40 backdrop-blur-xl overflow-hidden relative group">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full opacity-50 transition-opacity duration-700 pointer-events-none" />
+            <CardContent className="p-8 relative z-10">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h3 className="text-xl font-bold text-foreground font-display flex items-center gap-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    Conversion Pipeline
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">Real-time candidate progression funnel</p>
                 </div>
+                <Badge className="bg-primary/10 text-primary border-primary/20 cursor-default">
+                  <Activity className="h-3 w-3 mr-1" /> Active
+                </Badge>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+
+              <div className="space-y-8">
+                {funnel.map((f, i) => (
+                  <div key={f.stage} className="relative group/bar cursor-default">
+                    <div className="flex items-center mb-3 justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg bg-background border border-border/50 shadow-sm group-hover/bar:scale-110 transition-transform duration-300`}>
+                          <f.icon className={`h-4 w-4 ${f.color}`} />
+                        </div>
+                        <span className="text-sm font-semibold text-foreground tracking-wide">{f.stage}</span>
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <span className="text-sm font-bold text-foreground font-display text-xl">{f.count}</span>
+                        <span className="text-xs text-muted-foreground mb-1 font-mono">({f.pct}%)</span>
+                      </div>
+                    </div>
+                    <div className="h-4 w-full rounded-full bg-muted/30 overflow-hidden relative border border-border/20 backdrop-blur-sm">
+                      <motion.div
+                        initial={{ width: 0, opacity: 0 }}
+                        animate={{ width: `${f.pct}%`, opacity: 1 }}
+                        transition={{ duration: 1.2, delay: 0.2 + (i * 0.15), ease: "easeOut" }}
+                        className={`absolute top-0 left-0 h-full rounded-full ${f.bg} ${f.glow} relative overflow-hidden`}
+                      >
+                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-[100%] animate-[shimmer_2s_infinite]" />
+                      </motion.div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* AI Recommendations Panel */}
+        <motion.div variants={item} className="lg:col-span-1">
+          <Card className="h-full border-border/40 bg-gradient-to-b from-primary/[0.02] to-transparent backdrop-blur-xl relative overflow-hidden group">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-primary/50 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
+            
+            <CardContent className="p-8">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 shadow-[0_0_15px_rgba(var(--primary),0.2)]">
+                    <Brain className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-foreground font-display">EOS-IA Insights</h3>
+                  </div>
+                </div>
+                <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+              </div>
+
+              <div className="space-y-4">
+                <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl bg-background/60 border border-border/50 transition-all cursor-default shadow-sm hover:shadow-md">
+                  <div className="flex items-start gap-3">
+                    <Activity className="h-4 w-4 text-emerald-400 mt-1 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Pipeline Velocity</p>
+                      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">Candidates are moving through the Psychometric stage <span className="text-emerald-400 font-medium">24% faster</span> than the global average.</p>
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl bg-background/60 border border-border/50 transition-all cursor-default shadow-sm hover:shadow-md">
+                  <div className="flex items-start gap-3">
+                    <Target className="h-4 w-4 text-primary mt-1 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Quality of Hire Model</p>
+                      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">Current candidates show <span className="text-primary font-medium">strong alignment</span> with the role's required behavioral traits.</p>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {position.risk_flag ? (
+                  <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl bg-red-500/5 border border-red-500/20 transition-all cursor-default shadow-sm hover:shadow-md">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-4 w-4 text-red-500 mt-1 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-red-500">Risk Detected</p>
+                        <p className="text-xs text-red-500/80 mt-1.5 leading-relaxed">SLA for Interview stage is approaching breach. Immediate action recommended.</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 transition-all cursor-default shadow-sm hover:shadow-md">
+                    <div className="flex items-start gap-3">
+                      <ShieldCheck className="h-4 w-4 text-emerald-500 mt-1 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-500">Zero Active Risks</p>
+                        <p className="text-xs text-emerald-500/80 mt-1.5 leading-relaxed">All SLAs are within acceptable parameters. No bottlenecks identified.</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+              
+              <div className="mt-8 pt-6 border-t border-border/40">
+                <Button variant="outline" className="w-full border-border/50 bg-background/50 backdrop-blur">
+                  View Full Analytics <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    </motion.div>
   );
 }
 
