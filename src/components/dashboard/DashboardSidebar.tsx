@@ -15,11 +15,13 @@ import {
   ChevronLeft,
   Menu,
   FileText,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuthStore } from "@/store/authStore";
+import { ChangePasswordModal } from "./ChangePasswordModal";
 
 const mainNav = [
   { icon: Home, label: "Home", path: "/dashboard", section: "home" },
@@ -31,8 +33,9 @@ const mainNav = [
 ];
 
 const adminNav = [
-  { icon: Settings, label: "Config", path: "/dashboard" },
-  { icon: Shield, label: "Audit & Governance", path: "/dashboard" },
+  { icon: Settings, label: "Config", action: "config" },
+  { icon: Shield, label: "Audit & Governance", action: "audit" },
+  { icon: KeyRound, label: "Change Password", action: "password" },
 ];
 
 interface DashboardSidebarProps {
@@ -54,6 +57,7 @@ export function DashboardSidebar({
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const logout = useAuthStore((state) => state.logout);
 
   const handleLogout = () => {
@@ -129,15 +133,19 @@ export function DashboardSidebar({
             Admin
           </p>
           {adminNav.map((item) => (
-            <Link
+            <button
               key={item.label}
-              to={item.path}
-              onClick={() => isMobile && setMobileOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-sm"
+              onClick={() => {
+                if (item.action === "password") {
+                  setPasswordModalOpen(true);
+                }
+                if (isMobile) setMobileOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-sm font-medium"
             >
               <item.icon className="h-5 w-5 shrink-0" />
               {!isCollapsed && <span>{item.label}</span>}
-            </Link>
+            </button>
           ))}
         </div>
       </nav>
@@ -212,6 +220,7 @@ export function DashboardSidebar({
           )}
         />
       </Button>
+      <ChangePasswordModal open={passwordModalOpen} onOpenChange={setPasswordModalOpen} />
     </motion.aside>
   );
 }
