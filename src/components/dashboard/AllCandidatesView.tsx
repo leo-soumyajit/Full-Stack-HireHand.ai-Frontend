@@ -11,6 +11,8 @@ import {
   ChevronRight,
   Loader2,
   AlertTriangle,
+  Eye,
+  ArrowRight,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,7 +46,11 @@ function getInitials(name: string) {
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
 
-export function AllCandidatesView() {
+interface AllCandidatesViewProps {
+  onViewCandidate?: (positionId: string, candidateId: string) => void;
+}
+
+export function AllCandidatesView({ onViewCandidate }: AllCandidatesViewProps) {
   const { positions, isLoading, getCandidates } = usePositions();
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -79,10 +85,10 @@ export function AllCandidatesView() {
 
   // Flattened list for search across all positions
   const allCandidates = useMemo(() => {
-    const list: (ApiCandidate & { positionTitle: string })[] = [];
+    const list: (ApiCandidate & { positionTitle: string; positionId: string })[] = [];
     for (const pos of positions) {
       for (const c of candidatesMap[pos.id] ?? []) {
-        list.push({ ...c, positionTitle: pos.title });
+        list.push({ ...c, positionTitle: pos.title, positionId: pos.id });
       }
     }
     return list;
@@ -134,17 +140,30 @@ export function AllCandidatesView() {
                 <div className="py-10 text-center text-muted-foreground text-sm">No candidates match "{search}"</div>
               ) : (
                 filtered.map((c) => (
-                  <div key={c.id} className="flex items-center gap-4 px-5 py-3 border-b border-border/20 last:border-0 hover:bg-primary/5 transition-colors">
-                    <Avatar className="h-9 w-9 shrink-0">
+                  <div
+                    key={c.id}
+                    onClick={() => onViewCandidate?.(c.positionId, c.id)}
+                    className="flex items-center gap-4 px-5 py-3.5 border-b border-border/20 last:border-0 hover:bg-primary/5 transition-all cursor-pointer group"
+                  >
+                    <Avatar className="h-9 w-9 shrink-0 ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all">
                       <AvatarFallback className="bg-primary/15 text-primary text-xs font-semibold">{getInitials(c.name)}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">{c.name}</p>
+                      <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{c.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{c.role} · {c.positionTitle}</p>
                     </div>
                     <Badge variant="outline" className={`text-xs hidden sm:flex ${STAGE_COLORS[c.stage] || STAGE_COLORS["Sourced"]}`}>{c.stage}</Badge>
                     <Badge variant="outline" className={`text-xs ${VERDICT_COLORS[c.verdict] || VERDICT_COLORS["Pending"]}`}>{c.verdict}</Badge>
-                    <span className={`text-sm font-bold hidden md:inline ${c.scores.composite >= 85 ? "text-emerald-400" : c.scores.composite >= 70 ? "text-yellow-400" : "text-red-400"}`}>{c.scores.composite}%</span>
+                    <div className="hidden md:flex items-center gap-2 shrink-0">
+                      <div className="w-16 h-1.5 rounded-full bg-muted/60 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${c.scores.composite >= 85 ? 'bg-emerald-400' : c.scores.composite >= 70 ? 'bg-yellow-400' : 'bg-red-400'}`}
+                          style={{ width: `${Math.min(c.scores.composite, 100)}%` }}
+                        />
+                      </div>
+                      <span className={`text-sm font-bold ${c.scores.composite >= 85 ? "text-emerald-400" : c.scores.composite >= 70 ? "text-yellow-400" : "text-red-400"}`}>{c.scores.composite}%</span>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
                 ))
               )}
@@ -204,21 +223,34 @@ export function AllCandidatesView() {
                     <div className="py-8 text-center text-muted-foreground text-sm">No candidates yet for this position.</div>
                   ) : (
                     cands.map((c) => (
-                      <div key={c.id} className="flex items-center gap-4 px-5 py-3 border-b border-border/10 last:border-0 hover:bg-primary/5 transition-colors">
-                        <Avatar className="h-8 w-8 shrink-0">
+                      <div
+                        key={c.id}
+                        onClick={() => onViewCandidate?.(pos.id, c.id)}
+                        className="flex items-center gap-4 px-5 py-3.5 border-b border-border/10 last:border-0 hover:bg-primary/5 transition-all cursor-pointer group"
+                      >
+                        <Avatar className="h-9 w-9 shrink-0 ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all">
                           <AvatarFallback className="bg-primary/15 text-primary text-xs font-semibold">{getInitials(c.name)}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                          <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{c.name}</p>
                           <p className="text-xs text-muted-foreground truncate">{c.role}</p>
                         </div>
                         <Badge variant="outline" className={`text-xs hidden sm:flex ${STAGE_COLORS[c.stage] || STAGE_COLORS["Sourced"]}`}>{c.stage}</Badge>
                         <Badge variant="outline" className={`text-xs ${VERDICT_COLORS[c.verdict] || VERDICT_COLORS["Pending"]}`}>{c.verdict}</Badge>
-                        <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground shrink-0">
-                          <span className="font-mono">R:{c.scores.resume.toFixed(1)}</span>
-                          <span className="font-mono">P:{c.scores.psych.toFixed(1)}</span>
-                          <span className={`font-bold ${c.scores.composite >= 85 ? "text-emerald-400" : c.scores.composite >= 70 ? "text-yellow-400" : "text-red-400"}`}>{c.scores.composite}%</span>
+                        <div className="hidden md:flex items-center gap-3 shrink-0">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span className="font-mono">R:{c.scores.resume.toFixed(1)}</span>
+                            <span className="font-mono">P:{c.scores.psych.toFixed(1)}</span>
+                          </div>
+                          <div className="w-16 h-1.5 rounded-full bg-muted/60 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${c.scores.composite >= 85 ? 'bg-emerald-400' : c.scores.composite >= 70 ? 'bg-yellow-400' : 'bg-red-400'}`}
+                              style={{ width: `${Math.min(c.scores.composite, 100)}%` }}
+                            />
+                          </div>
+                          <span className={`text-sm font-bold ${c.scores.composite >= 85 ? "text-emerald-400" : c.scores.composite >= 70 ? "text-yellow-400" : "text-red-400"}`}>{c.scores.composite}%</span>
                         </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
                       </div>
                     ))
                   )}

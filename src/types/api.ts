@@ -25,6 +25,18 @@ export interface ApiL1Question {
   level?: string; // "L1" | "L2" | "L3" | "L4" | "L5"
 }
 
+export interface ApiCustomSectionConfig {
+  name: string;
+  weight_percentage: number;
+}
+
+export interface ApiPositionScreeningRules {
+  enabled: boolean;
+  sections: ApiCustomSectionConfig[];
+  auto_select_threshold: number;
+  auto_reject_threshold: number;
+}
+
 export interface ApiPosition {
   id: string;
   req_id: string;
@@ -37,6 +49,7 @@ export interface ApiPosition {
   jd?: ApiPositionJD | null;
   jd_versions: ApiJDVersion[];
   l1_questions?: ApiL1Question[];
+  screening_rules?: ApiPositionScreeningRules | null;
   candidates_count: number;
   shortlisted_count: number;
   risk_flag?: string | null;
@@ -65,6 +78,11 @@ export interface ApiCandidate {
     candidate_name: string;
     candidate_email: string;
     candidate_current_role: string;
+    social_links?: {
+      linkedin?: string | null;
+      github?: string | null;
+      portfolio?: string | null;
+    } | null;
     resume_score: number;
     jd_match_percent: number;
     recommended_stage: string;

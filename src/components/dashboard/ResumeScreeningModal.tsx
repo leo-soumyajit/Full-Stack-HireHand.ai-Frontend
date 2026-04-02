@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { screenResume, type ResumeAnalysis } from "@/lib/resumeApi";
 import { useToast } from "@/hooks/use-toast";
+import { ScreeningEngineSettings } from "./ScreeningEngineSettings";
+import { Settings2 } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -110,12 +112,14 @@ export function ResumeScreeningModal({
   const [fileData, setFileData] = useState<{ name: string; size: number; base64: string } | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<{ analysis: ResumeAnalysis; candidateId: string | null } | null>(null);
+  const [viewMode, setViewMode] = useState<"upload" | "settings">("upload");
 
   const reset = () => {
     setFileData(null);
     setResult(null);
     setAnalyzing(false);
     setIsDragging(false);
+    setViewMode("upload");
   };
 
   const handleClose = () => {
@@ -214,12 +218,29 @@ export function ResumeScreeningModal({
                   <p className="text-xs text-muted-foreground">{positionTitle}</p>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={handleClose} className="rounded-full">
-                <X className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setViewMode(v => v === "upload" ? "settings" : "upload")}
+                  className={viewMode === "settings" ? "bg-primary/10 text-primary border-primary/30" : ""}
+                >
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Rules
+                </Button>
+                <Button variant="ghost" size="icon" onClick={handleClose} className="rounded-full">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             {/* Body */}
+            {viewMode === "settings" ? (
+              <ScreeningEngineSettings 
+                positionId={positionId} 
+                onClose={() => setViewMode("upload")} 
+              />
+            ) : (
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
               {/* Upload Zone */}
               {!result && (
@@ -341,12 +362,13 @@ export function ResumeScreeningModal({
                 </div>
               )}
             </div>
+            )}
 
             {/* Footer */}
-            {fileData && !result && !analyzing && (
+            {viewMode === "upload" && fileData && !result && !analyzing && (
               <div className="flex items-center justify-between gap-3 p-6 border-t border-border/30 shrink-0">
                 <p className="text-xs text-muted-foreground">
-                  AI will analyze vs <span className="text-foreground font-medium">{positionTitle}</span> JD
+                  AI will analyze vs <span className="text-foreground font-medium">{positionTitle}</span> rules
                 </p>
                 <Button
                   onClick={handleAnalyze}

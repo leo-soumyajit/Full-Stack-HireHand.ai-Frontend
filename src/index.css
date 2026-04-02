@@ -119,6 +119,10 @@
     @apply bg-card/60 backdrop-blur-2xl border border-border/40 shadow-sm dark:shadow-none transition-all hover:shadow-md dark:hover:shadow-[0_0_15px_-3px_hsl(var(--primary)/0.15)] hover:-translate-y-0.5;
   }
 
+  .glass-strong {
+    @apply bg-background/50 backdrop-blur-3xl border border-border/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.12)];
+  }
+
   .gradient-primary {
     @apply bg-gradient-to-r from-primary to-accent;
   }

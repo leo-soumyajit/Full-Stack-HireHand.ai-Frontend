@@ -43,6 +43,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -118,6 +128,7 @@ export function CandidatesTab({
   const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
   const [screenResumeOpen, setScreenResumeOpen] = useState(false);
   const [schedulingModalOpen, setSchedulingModalOpen] = useState<{ candidateId: string; candidateName: string } | null>(null);
+  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
   const [topN, setTopN] = useState<string>("");
   const [isSendingMail, setIsSendingMail] = useState<string | false>(false);
   const [dispatchingStatus, setDispatchingStatus] = useState<Record<string, boolean>>({});
@@ -219,11 +230,14 @@ export function CandidatesTab({
     }
   };
 
-  const handleDelete = async (candidateId: string) => {
-    if (!window.confirm("Remove this candidate?")) return;
+  const confirmDelete = async () => {
+    if (!deleteCandidateId) return;
+    const candidateId = deleteCandidateId;
+    setDeleteCandidateId(null);
     setCandidates(prev => prev.filter(c => c.id !== candidateId));
     try {
       await onDeleteCandidate(candidateId);
+      toast({ title: "Candidate removed" });
     } catch (err) {
       await loadCandidates();
       toast({ title: "Delete failed", description: String(err), variant: "destructive" });
@@ -376,7 +390,7 @@ export function CandidatesTab({
                   <RotateCcw className="h-4 w-4" /><span>Undo Rejection</span>
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={() => handleDelete(c.id)} className="text-red-400 focus:text-red-400 focus:bg-red-500/10 gap-2 cursor-pointer">
+              <DropdownMenuItem onClick={() => setDeleteCandidateId(c.id)} className="text-red-400 focus:text-red-400 focus:bg-red-500/10 gap-2 cursor-pointer">
                 <Trash2 className="h-4 w-4" /><span>Remove</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -582,6 +596,28 @@ export function CandidatesTab({
           onScheduled={() => loadCandidates()}
         />
       )}
+      <AlertDialog open={!!deleteCandidateId} onOpenChange={(open) => !open && setDeleteCandidateId(null)}>
+        <AlertDialogContent className="bg-card border-border/40 max-w-md shadow-2xl glass-strong">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground font-display flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-500" />
+              Remove Candidate?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-sm">
+              This action will permanently delete this candidate's profile and AI screening data. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-2">
+            <AlertDialogCancel className="border-border/40 hover:bg-muted/50 rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              className="bg-red-500 text-white hover:bg-red-600 shadow-none rounded-xl font-semibold border-none"
+            >
+              Remove Candidate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

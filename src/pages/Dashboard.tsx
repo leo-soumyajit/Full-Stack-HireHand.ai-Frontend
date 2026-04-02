@@ -49,6 +49,17 @@ const Dashboard = () => {
     });
   };
 
+  const handleViewCandidate = (positionId: string, candidateId: string) => {
+    setSearchParams(prev => {
+      prev.set("p", positionId);
+      prev.set("v", "position-detail");
+      prev.set("s", "positions");
+      prev.set("t", "candidates");
+      prev.set("c", candidateId);
+      return prev;
+    });
+  };
+
   const handleBackToHome = () => {
     setSearchParams(prev => {
       if (activeSection === "candidates") {
@@ -123,7 +134,7 @@ const Dashboard = () => {
               <DashboardHome key="home" onViewPosition={handleViewPosition} />
             )}
             {view === "candidates" && (
-              <AllCandidatesView key="candidates" />
+              <AllCandidatesView key="candidates" onViewCandidate={handleViewCandidate} />
             )}
             {view === "position-detail" && selectedPositionId && (
               <PositionDetail

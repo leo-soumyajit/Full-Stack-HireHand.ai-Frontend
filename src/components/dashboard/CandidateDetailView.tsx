@@ -1,17 +1,41 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Download, Briefcase, Mail, CheckCircle2, AlertCircle, Loader2, Sparkles, BrainCircuit } from "lucide-react";
+import { 
+  ArrowLeft, Download, Briefcase, Mail, CheckCircle2, AlertCircle, Loader2, Sparkles, BrainCircuit,
+  MoreVertical, Trash2, UserMinus, RotateCcw, Send, CalendarIcon, FileBarChart, Brain,
+  Linkedin, Github, Link
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MainLoader } from "@/components/ui/main-loader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { FitmentReportPanel } from "./FitmentReportPanel";
 import { PsychometricScoringModal } from "./PsychometricScoringModal";
+import { SchedulingModal } from "./SchedulingModal";
 import { ApiCandidate } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, candidatesApi, assessmentApi } from "@/lib/api";
+import { psychometricApi } from "@/lib/psychometricApi";
+import { generateFitmentPDF } from "@/lib/generateFitmentPDF";
 
 function getToken(): string | null {
   try {
@@ -46,6 +70,10 @@ export function CandidateDetailView({ candidateId, positionId, initialTab = "res
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [scoringModalOpen, setScoringModalOpen] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [schedulingModalOpen, setSchedulingModalOpen] = useState(false);
   const [newlyGeneratedReport, setNewlyGeneratedReport] = useState<any>(null);
   const [activeTab, setActiveTab] = useState(initialTab);
   const { toast } = useToast();
@@ -96,6 +124,67 @@ export function CandidateDetailView({ candidateId, positionId, initialTab = "res
     }
   };
 
+  const handleReject = async () => {
+    try {
+      await candidatesApi.update(candidateId, { stage: "Rejected", verdict: "No-Go" });
+      setCandidate(prev => prev ? { ...prev, stage: "Rejected", verdict: "No-Go" } : null);
+      toast({ title: "Candidate rejected" });
+    } catch (err) {
+      toast({ title: "Failed to reject", description: String(err), variant: "destructive" });
+    }
+  };
+
+  const handleRevert = async () => {
+    try {
+      await candidatesApi.update(candidateId, { stage: "Sourced", verdict: "Pending" });
+      setCandidate(prev => prev ? { ...prev, stage: "Sourced", verdict: "Pending" } : null);
+      toast({ title: "Rejection reverted" });
+    } catch (err) {
+      toast({ title: "Failed to revert", description: String(err), variant: "destructive" });
+    }
+  };
+
+  const confirmDelete = async () => {
+    setDeleteDialogOpen(false);
+    try {
+      // Direct pass to API fetch to skip complicated context prop drilling
+      await apiFetch(`/api/positions/candidates/${candidateId}`, { method: 'DELETE' });
+      toast({ title: "Candidate removed" });
+      onBack();
+    } catch (err) {
+      toast({ title: "Delete failed", description: String(err), variant: "destructive" });
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    setDownloadingPDF(true);
+    try {
+      const report = await psychometricApi.getReport(candidateId);
+      await generateFitmentPDF(report, candidate?.name || "Candidate", "Detailed Report");
+      toast({ title: "PDF Downloaded ✅" });
+    } catch {
+      toast({
+        title: "No Fitment Report",
+        description: "Generate a psychometric report first.",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
+  const handleDispatchAssessment = async () => {
+    setDispatching(true);
+    try {
+      await assessmentApi.send({ position_id: positionId, candidate_id: candidateId });
+      toast({ title: "Assessment Dispatched!", description: "Magic link sent to candidate successfully." });
+    } catch (err: any) {
+      toast({ title: "Dispatch Failed", description: err.message || String(err), variant: "destructive" });
+    } finally {
+      setDispatching(false);
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 flex flex-col h-full">
       {/* Header */}
@@ -114,18 +203,70 @@ export function CandidateDetailView({ candidateId, positionId, initialTab = "res
               {candidate?.name || "Loading Candidate..."}
               {candidate && <Badge variant="outline" className="text-xs tracking-wider uppercase font-semibold border-primary/30 text-primary bg-primary/5">{candidate.verdict}</Badge>}
             </h2>
-            <div className="flex items-center gap-4 mt-1">
+            <div className="flex items-center gap-4 mt-2">
               <span className="flex items-center text-sm text-muted-foreground"><Briefcase className="w-3.5 h-3.5 mr-1.5" />{candidate?.role || "--"}</span>
               <span className="flex items-center text-sm text-muted-foreground"><Mail className="w-3.5 h-3.5 mr-1.5" />{candidate?.email || "--"}</span>
             </div>
+            {candidate?.resume_analysis?.social_links && (
+              <div className="flex items-center gap-3 mt-2.5">
+                {candidate.resume_analysis.social_links.github && candidate.resume_analysis.social_links.github.toLowerCase() !== "null" && candidate.resume_analysis.social_links.github.toLowerCase() !== "none" && (
+                  <a href={candidate.resume_analysis.social_links.github.startsWith('http') ? candidate.resume_analysis.social_links.github : `https://${candidate.resume_analysis.social_links.github}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-white hover:underline bg-slate-500/20 px-2 py-1 rounded-md transition-colors">
+                    <Github className="w-3.5 h-3.5" /> GitHub
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
         
         <div className="flex items-center gap-3 ml-12 sm:ml-0">
           <Button onClick={handleDownloadResume} disabled={isDownloading || !candidate} className="gap-2 bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25 border border-indigo-500/30">
             {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            Download Original Resume
+            Original Resume
           </Button>
+
+          {candidate && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-10 w-10 border border-border/40 hover:bg-muted/50 rounded-xl hover:border-border/60 transition-colors">
+                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card border-border/50 z-50 w-56">
+                <DropdownMenuItem onClick={() => setScoringModalOpen(true)} className="gap-2 cursor-pointer">
+                  <Brain className="h-4 w-4 text-primary" /><span>Manual Score (Legacy)</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setActiveTab("psychometric")} className="gap-2 cursor-pointer">
+                  <FileBarChart className="h-4 w-4 text-emerald-400" /><span>View Fitment Report</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSchedulingModalOpen(true)} className="gap-2 cursor-pointer">
+                  <CalendarIcon className="h-4 w-4 text-indigo-400" /><span>Schedule Interview</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownloadPDF} disabled={downloadingPDF} className="gap-2 cursor-pointer">
+                  {downloadingPDF ? <Loader2 className="h-4 w-4 animate-spin text-blue-400" /> : <Download className="h-4 w-4 text-blue-400" />}
+                  <span>{downloadingPDF ? "Generating PDF..." : "Download PDF Report"}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-border/40" />
+                <DropdownMenuItem onClick={handleDispatchAssessment} disabled={dispatching} className="gap-2 cursor-pointer">
+                  {dispatching ? <Loader2 className="h-4 w-4 animate-spin text-purple-400" /> : <Send className="h-4 w-4 text-purple-400" />}
+                  <span>{dispatching ? "Dispatching..." : "Dispatch Assessment"}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-border/40" />
+                {candidate.stage !== "Rejected" && candidate.verdict !== "No-Go" ? (
+                  <DropdownMenuItem onClick={handleReject} className="text-orange-400 focus:text-orange-400 focus:bg-orange-500/10 gap-2 cursor-pointer">
+                    <UserMinus className="h-4 w-4" /><span>Reject Candidate</span>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={handleRevert} className="text-emerald-400 focus:text-emerald-400 focus:bg-emerald-500/10 gap-2 cursor-pointer">
+                    <RotateCcw className="h-4 w-4" /><span>Undo Rejection</span>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => setDeleteDialogOpen(true)} className="text-red-400 focus:text-red-400 focus:bg-red-500/10 gap-2 cursor-pointer">
+                  <Trash2 className="h-4 w-4" /><span>Remove</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
@@ -271,6 +412,40 @@ export function CandidateDetailView({ candidateId, positionId, initialTab = "res
         positionId={positionId}
         onReportGenerated={(r) => setNewlyGeneratedReport(r)}
       />
+
+      {schedulingModalOpen && candidate && (
+        <SchedulingModal
+          open={schedulingModalOpen}
+          onClose={() => setSchedulingModalOpen(false)}
+          candidateId={candidate.id}
+          candidateName={candidate.name}
+          positionId={positionId}
+          onScheduled={() => loadDetails()}
+        />
+      )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-card border-border/40 max-w-md shadow-2xl glass-strong">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground font-display flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-500" />
+              Remove Candidate?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground text-sm">
+              This action will permanently delete this candidate's profile and AI screening data. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-2">
+            <AlertDialogCancel className="border-border/40 hover:bg-muted/50 rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              className="bg-red-500 text-white hover:bg-red-600 shadow-none rounded-xl font-semibold border-none"
+            >
+              Remove Candidate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }

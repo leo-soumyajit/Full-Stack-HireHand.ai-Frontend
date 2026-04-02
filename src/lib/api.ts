@@ -69,6 +69,9 @@ export const positionsApi = {
       `/api/positions${status ? `?status_filter=${status}` : ''}`
     ),
 
+  get: (id: string) =>
+    apiFetch<import('@/types/api').ApiPosition>(`/api/positions/${id}`),
+
   create: (body: { title: string; business_unit: string; location: string; level: string; years_of_experience?: string }) =>
     apiFetch<import('@/types/api').ApiPosition>('/api/positions', {
       method: 'POST',
@@ -97,6 +100,12 @@ export const positionsApi = {
     apiFetch<import('@/types/api').ApiPosition>(`/api/positions/${id}/l1-questions`, {
       method: 'PUT',
       body: JSON.stringify({ questions }),
+    }),
+
+  saveScreeningRules: (id: string, rules: any) =>
+    apiFetch<import('@/types/api').ApiPosition>(`/api/positions/${id}/screening-rules`, {
+      method: 'PUT',
+      body: JSON.stringify(rules),
     }),
 
   delete: (id: string) =>
