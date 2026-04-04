@@ -695,7 +695,15 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
       {viewMode === "chat" ? (
         /* ── Chat View ────────────────────────────────────────────── */
         <Card className="glass-card">
-          <CardContent className="p-4 space-y-3" style={{ maxHeight: "65vh", overflowY: "scroll", overscrollBehavior: "contain" }}>
+          <div
+            className="p-4 space-y-3"
+            style={{ maxHeight: "65vh", overflowY: "auto", overscrollBehavior: "contain" }}
+            onWheel={(e) => {
+              // Force scroll inside this container, prevent parent from stealing wheel events
+              e.stopPropagation();
+              e.currentTarget.scrollTop += e.deltaY;
+            }}
+          >
             {chatMessages.length === 0 ? (
               <p className="text-muted-foreground text-sm text-center py-8">No transcript available</p>
             ) : (
@@ -723,7 +731,7 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
                 );
               })
             )}
-          </CardContent>
+          </div>
         </Card>
       ) : (
         /* ── Q&A Pairs View ───────────────────────────────────────── */
