@@ -113,7 +113,7 @@ export default function InterviewRoom() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [showTranscript, setShowTranscript] = useState(true); // Both sides see transcript
+  const [showTranscript, setShowTranscript] = useState(role === "host"); // Only Host sees transcript
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [interimText, setInterimText] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -136,6 +136,7 @@ export default function InterviewRoom() {
   const entryIdRef = useRef(0);
   const timerRef = useRef<number | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
 
   const dataConnRef = useRef<any>(null);
 
@@ -350,20 +351,13 @@ export default function InterviewRoom() {
     }, 10000);
 
     call.on("stream", (remoteStream) => {
-      console.log("📡 Received remote stream!");
+      console.log("📡 Received remote stream! Tracks:", remoteStream.getTracks().map(t => `${t.kind}:${t.readyState}`));
       clearTimeout(streamTimeout);
       
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = remoteStream;
-        // Force play just in case autoPlay is blocked by browser policies
-        remoteVideoRef.current.play().catch(e => console.error("Play prevented:", e));
-      }
+      // Store stream in ref so useEffect can bind it after React renders the video element
+      remoteStreamRef.current = remoteStream;
       setConnectionStatus("connected");
       
-      // If we are Host, we don't naturally get remote metadata name because Guest didn't send it in 'answer'.
-      // Wait, Host DOES get name from call.metadata on creation! So Host is fine. 
-      // If we are Guest, Host answered but Host's answer() doesn't carry metadata. 
-      // We will just label the Host as "Interviewer" if we don't have a name.
       if (role === "guest") {
           setRemoteName("Interviewer");
       }
@@ -388,6 +382,7 @@ export default function InterviewRoom() {
 
     // Check speech recognition support
     // Start speech recognition for BOTH host and guest (both transcribe their own voice)
+    // Guest's transcript gets sent to Host via data channel
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setSpeechSupported(false);
@@ -397,6 +392,15 @@ export default function InterviewRoom() {
 
     await initPeer(stream);
   };
+
+  // ── Bind remote stream to video element AFTER React renders it ─────
+  useEffect(() => {
+    if (connectionStatus === "connected" && remoteStreamRef.current && remoteVideoRef.current) {
+      console.log("🎥 Binding remote stream to video element");
+      remoteVideoRef.current.srcObject = remoteStreamRef.current;
+      remoteVideoRef.current.play().catch(e => console.error("Play prevented:", e));
+    }
+  }, [connectionStatus]);
 
   // ── Toggle Controls ────────────────────────────────────────────────
   const toggleMic = () => {
