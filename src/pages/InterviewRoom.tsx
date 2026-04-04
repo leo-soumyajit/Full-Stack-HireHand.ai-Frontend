@@ -62,13 +62,8 @@ function useSpeechRecognition(onTranscript: (text: string, isFinal: boolean) => 
 
     recognition.onerror = (event: any) => {
       console.warn("Speech recognition error:", event.error);
-      if (event.error === "no-speech" || event.error === "aborted") {
-        // Auto-restart on transient errors
-        if (isRunningRef.current) {
-          setTimeout(() => {
-            try { recognition.start(); } catch { /* ignore */ }
-          }, 500);
-        }
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          isRunningRef.current = false;
       }
     };
 
@@ -77,7 +72,7 @@ function useSpeechRecognition(onTranscript: (text: string, isFinal: boolean) => 
       if (isRunningRef.current) {
         setTimeout(() => {
           try { recognition.start(); } catch { /* ignore */ }
-        }, 300);
+        }, 800);
       }
     };
 
@@ -139,13 +134,18 @@ export default function InterviewRoom() {
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptLastFetchRef = useRef<string | null>(null);
+  const lastFinalRef = useRef<string>("");
 
   // ── Speech Recognition ─────────────────────────────────────────────
 
   const handleTranscript = useCallback((text: string, isFinal: boolean) => {
     if (isFinal) {
+      const cleanText = text.trim();
+      if (!cleanText || cleanText === lastFinalRef.current) return; // Prevent exact duplicates from engine
+      lastFinalRef.current = cleanText;
+
       const ts = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      const entry: TranscriptEntry = { id: Date.now() + Math.random(), text: text.trim(), timestamp: ts, isFinal: true, speaker: userName };
+      const entry: TranscriptEntry = { id: Date.now() + Math.random(), text: cleanText, timestamp: ts, isFinal: true, speaker: userName };
       
       setTranscript(prev => [...prev, entry]);
       setInterimText("");
@@ -195,7 +195,15 @@ export default function InterviewRoom() {
                     }));
                 
                 if (otherSpeakerEntries.length > 0) {
-                    setTranscript(prev => [...prev, ...otherSpeakerEntries]);
+                    setTranscript(prev => {
+                        // Deduplicate deeply by text and speaker and timestamp to avoid react strict mode/api glitches
+                        const current = [...prev];
+                        otherSpeakerEntries.forEach((newE: any) => {
+                           const exists = current.some(p => p.text === newE.text && p.speaker === newE.speaker && p.timestamp === newE.timestamp);
+                           if (!exists) current.push(newE);
+                        });
+                        return current;
+                    });
                 }
              }
           }
