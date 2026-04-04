@@ -69,7 +69,10 @@ export function useDeepgram(onTranscript: (text: string, isFinal: boolean) => vo
           const options: MediaRecorderOptions = {};
           if (mimeType) options.mimeType = mimeType;
 
-          const mediaRecorder = new MediaRecorder(stream, options);
+          // CRITICAL FIX: Extract only the audio track! 
+          // Chromium throws NotSupportedError if you pass a stream with a video track to an audio/* mimeType
+          const audioStream = new MediaStream(stream.getAudioTracks());
+          const mediaRecorder = new MediaRecorder(audioStream, options);
           mediaRecorderRef.current = mediaRecorder;
 
           mediaRecorder.addEventListener("dataavailable", (event: BlobEvent) => {
