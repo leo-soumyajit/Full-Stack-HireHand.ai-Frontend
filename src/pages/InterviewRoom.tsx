@@ -364,13 +364,8 @@ export default function InterviewRoom() {
     const stream = await initMedia();
     if (!stream) return;
 
-    // CRITICAL FIX: Clone the entire stream so Deepgram and PeerJS have 
-    // completely isolated MediaStreamTracks. Without this, Chrome's media 
-    // pipeline breaks WebRTC when MediaRecorder consumes the same track!
-    const deepgramStream = stream.clone();
-
     // Start Deepgram live transcription (Nova-2, Indian English)
-    deepgram.start(deepgramStream);
+    deepgram.start(stream);
 
     await initPeer(stream);
   };
