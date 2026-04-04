@@ -45,6 +45,7 @@ import { CandidateDetailView } from "@/components/dashboard/CandidateDetailView"
 import { PsychometricScoringModal } from "@/components/dashboard/PsychometricScoringModal";
 import { FitmentReportPanel } from "@/components/dashboard/FitmentReportPanel";
 import { PositionL1QuestionsTab } from "@/components/dashboard/PositionL1QuestionsTab";
+import { InterviewIntelligenceTab } from "@/components/dashboard/InterviewIntelligenceTab";
 import { psychometricApi } from "@/lib/psychometricApi";
 import type { PsychometricProfile, FitmentReport } from "@/types/psychometric";
 import { JDComparisonSlider } from "@/components/ui/jd-comparison-slider";
@@ -245,7 +246,10 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
           }}
         />
       )}
-      {!["overview", "jd", "candidates", "l1-questions", "psychometrics"].includes(activeTab) && (
+      {activeTab === "interviews" && (
+        <InterviewIntelligenceTab positionId={positionId} positionTitle={position.title} />
+      )}
+      {!["overview", "jd", "candidates", "l1-questions", "psychometrics", "interviews"].includes(activeTab) && (
         <Card className="glass-card">
           <CardContent className="p-12 text-center">
             <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-muted mb-4">

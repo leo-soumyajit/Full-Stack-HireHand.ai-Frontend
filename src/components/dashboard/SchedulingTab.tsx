@@ -194,6 +194,17 @@ function ScheduleCard({ schedule, isPast, onStatusChange }: { schedule: ApiSched
 
             {/* Actions */}
             <div className="flex items-center gap-2 mt-4 flex-wrap">
+              {schedule.room_id && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="bg-indigo-500/10 border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 transition-colors gap-2"
+                  onClick={() => window.open(`/interview/${schedule.room_id}?role=host&sid=${schedule.id}`, "_blank")}
+                >
+                  <Video className="h-3.5 w-3.5" />
+                  Start HireHand Interview
+                </Button>
+              )}
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -201,7 +212,7 @@ function ScheduleCard({ schedule, isPast, onStatusChange }: { schedule: ApiSched
                 onClick={() => window.open(schedule.meeting_link, "_blank")}
               >
                 <Video className="h-3.5 w-3.5" />
-                Join Video Call
+                Join Jitsi Call
               </Button>
               
               {!isPast && onStatusChange && (
