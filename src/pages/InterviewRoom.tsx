@@ -6,14 +6,11 @@ import {
   MicOff,
   Video as VideoIcon,
   VideoOff,
-  Phone,
   PhoneOff,
   MessageSquareText,
   Clock,
   Wifi,
   WifiOff,
-  ChevronRight,
-  AlertCircle,
   CheckCircle2,
   Loader2,
   Copy,
@@ -63,7 +60,7 @@ export default function InterviewRoom() {
   const [preJoin, setPreJoin] = useState(true);
   const [userName, setUserName] = useState(role === "host" ? "Interviewer" : "Candidate");
   const [remoteName, setRemoteName] = useState("");
-  const [speechSupported, setSpeechSupported] = useState(true);
+
   const [linkCopied, setLinkCopied] = useState(false);
 
   // ── Refs ───────────────────────────────────────────────────────────
@@ -201,9 +198,6 @@ export default function InterviewRoom() {
     if (!preJoin) return;
     let stream: MediaStream | null = null;
 
-    // Check speech support on load
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) setSpeechSupported(false);
 
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(s => {
       stream = s;
@@ -527,12 +521,7 @@ export default function InterviewRoom() {
             Join Interview
           </button>
 
-          {!speechSupported && (
-            <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>Speech recognition is not supported in your browser. Use Chrome or Edge for live transcription.</span>
-            </div>
-          )}
+
 
           {role === "host" && (
             <p className="text-white/30 text-xs text-center mt-4">
@@ -591,7 +580,7 @@ export default function InterviewRoom() {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Video Section */}
-        <div className={`flex-1 flex flex-col p-4 transition-all ${showTranscript ? "" : ""}`}>
+        <div className="flex-1 flex flex-col p-4 relative">
           {/* Remote Video (Main) */}
           <div className="flex-1 relative rounded-2xl overflow-hidden bg-[#1a1a2e] border border-white/5">
             {connectionStatus === "connected" ? (
@@ -623,18 +612,18 @@ export default function InterviewRoom() {
                 {remoteName}
               </div>
             )}
-          </div>
 
-          {/* Local Video (PiP) */}
-          <div className="absolute bottom-24 right-6 w-48 aspect-video rounded-xl overflow-hidden bg-[#1a1a2e] border-2 border-white/10 shadow-2xl z-10">
-            <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-            {!isCameraOn && (
-              <div className="absolute inset-0 bg-[#1a1a2e] flex items-center justify-center">
-                <VideoOff className="h-5 w-5 text-white/30" />
+            {/* Local Video (PiP) — Positioned INSIDE the video area */}
+            <div className="absolute bottom-4 right-4 w-36 aspect-video rounded-xl overflow-hidden bg-[#1a1a2e] border-2 border-white/10 shadow-2xl z-10">
+              <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+              {!isCameraOn && (
+                <div className="absolute inset-0 bg-[#1a1a2e] flex items-center justify-center">
+                  <VideoOff className="h-5 w-5 text-white/30" />
+                </div>
+              )}
+              <div className="absolute bottom-1 left-1 px-2 py-0.5 rounded-full bg-black/60 text-white/80 text-[10px]">
+                {userName}
               </div>
-            )}
-            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-white/80 text-[10px]">
-              {userName}
             </div>
           </div>
         </div>
