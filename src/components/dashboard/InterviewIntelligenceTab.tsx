@@ -37,7 +37,7 @@ interface Props {
   positionTitle: string;
 }
 
-type ReportTab = "interviewer" | "candidate" | "quality";
+type ReportTab = "interviewer" | "candidate" | "quality" | "transcript";
 
 export function InterviewIntelligenceTab({ positionId, positionTitle }: Props) {
   const [analyses, setAnalyses] = useState<InterviewAnalysisListItem[]>([]);
@@ -162,6 +162,7 @@ export function InterviewIntelligenceTab({ positionId, positionTitle }: Props) {
             { id: "interviewer" as ReportTab, label: "Recruiter Report", icon: Target },
             { id: "candidate" as ReportTab, label: "Candidate Feedback", icon: Users },
             { id: "quality" as ReportTab, label: "Interview Quality", icon: Award },
+            { id: "transcript" as ReportTab, label: "Full Transcript", icon: FileText },
           ]).map(t => (
             <button
               key={t.id}
@@ -218,6 +219,7 @@ export function InterviewIntelligenceTab({ positionId, positionTitle }: Props) {
               {reportTab === "interviewer" && <InterviewerReportView report={ir} />}
               {reportTab === "candidate" && <CandidateReportView report={cr} />}
               {reportTab === "quality" && <QualityReportView report={iq} />}
+              {reportTab === "transcript" && <TranscriptView transcript={detail.transcript} parsedQA={detail.parsed_transcript} candidateName={detail.candidate_name} />}
             </motion.div>
           )}
         </AnimatePresence>
@@ -633,6 +635,148 @@ function QualityReportView({ report }: { report: any }) {
                 </li>
               ))}
             </ul>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
+// TRANSCRIPT VIEW — Full interview conversation history
+// ══════════════════════════════════════════════════════════════════════
+function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: string; parsedQA?: any; candidateName: string }) {
+  const [viewMode, setViewMode] = useState<"chat" | "qa">("chat");
+
+  // Parse raw transcript into chat messages
+  const chatMessages = (transcript || "").split("\n").filter(l => l.trim()).map((line, i) => {
+    // Format: [HH:MM:SS] Speaker: Text
+    const match = line.match(/^\[?([\d:]+)\]?\s*(.+?):\s*(.+)$/);
+    if (match) {
+      return { id: i, time: match[1], speaker: match[2].trim(), text: match[3].trim() };
+    }
+    return { id: i, time: "", speaker: "Unknown", text: line.trim() };
+  });
+
+  const qaList = parsedQA?.parsed_qa || [];
+
+  return (
+    <div className="space-y-4">
+      {/* View Mode Toggle */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setViewMode("chat")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            viewMode === "chat"
+              ? "bg-primary/10 text-primary border border-primary/20"
+              : "text-muted-foreground hover:text-foreground bg-muted/30"
+          }`}
+        >
+          💬 Chat View
+        </button>
+        {qaList.length > 0 && (
+          <button
+            onClick={() => setViewMode("qa")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === "qa"
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "text-muted-foreground hover:text-foreground bg-muted/30"
+            }`}
+          >
+            📋 Q&A Pairs
+          </button>
+        )}
+        <span className="text-xs text-muted-foreground ml-auto">
+          {viewMode === "chat" ? `${chatMessages.length} messages` : `${qaList.length} questions`}
+        </span>
+      </div>
+
+      {viewMode === "chat" ? (
+        /* ── Chat View ────────────────────────────────────────────── */
+        <Card className="glass-card">
+          <CardContent className="p-4 max-h-[500px] overflow-y-auto space-y-3">
+            {chatMessages.length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-8">No transcript available</p>
+            ) : (
+              chatMessages.map((msg) => {
+                const isCandidate = msg.speaker.toLowerCase().includes("candidate") || 
+                                    msg.speaker.toLowerCase() === candidateName.toLowerCase();
+                return (
+                  <div key={msg.id} className={`flex ${isCandidate ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
+                        isCandidate
+                          ? "bg-primary/15 border border-primary/20 rounded-br-md"
+                          : "bg-muted/50 border border-border/30 rounded-bl-md"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-xs font-semibold ${isCandidate ? "text-primary" : "text-foreground/70"}`}>
+                          {msg.speaker}
+                        </span>
+                        {msg.time && <span className="text-[10px] text-muted-foreground">{msg.time}</span>}
+                      </div>
+                      <p className="text-sm text-foreground/90">{msg.text}</p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        /* ── Q&A Pairs View ───────────────────────────────────────── */
+        <div className="space-y-4">
+          {qaList.map((qa: any, i: number) => (
+            <Card key={i} className="glass-card">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px]">Q{qa.question_number || i + 1}</Badge>
+                  <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">{qa.topic_category || "General"}</Badge>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1 font-semibold">INTERVIEWER</p>
+                  <p className="text-sm text-foreground">{qa.interviewer_question}</p>
+                </div>
+                <div className="border-l-2 border-primary/30 pl-3">
+                  <p className="text-xs text-muted-foreground mb-1 font-semibold">CANDIDATE</p>
+                  <p className="text-sm text-foreground/90">{qa.candidate_answer}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Metadata */}
+      {parsedQA && (
+        <Card className="glass-card">
+          <CardContent className="p-4 flex flex-wrap gap-4">
+            {parsedQA.total_questions && (
+              <div className="text-center">
+                <p className="text-lg font-bold text-foreground">{parsedQA.total_questions}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Questions</p>
+              </div>
+            )}
+            {parsedQA.conversation_quality && (
+              <div className="text-center">
+                <p className={`text-lg font-bold ${parsedQA.conversation_quality === "HIGH" ? "text-emerald-400" : parsedQA.conversation_quality === "MEDIUM" ? "text-amber-400" : "text-red-400"}`}>
+                  {parsedQA.conversation_quality}
+                </p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Quality</p>
+              </div>
+            )}
+            {parsedQA.key_topics_discussed && (
+              <div className="flex-1">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Topics Covered</p>
+                <div className="flex flex-wrap gap-1">
+                  {parsedQA.key_topics_discussed.map((t: string, i: number) => (
+                    <Badge key={i} variant="outline" className="text-[10px]">{t}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
