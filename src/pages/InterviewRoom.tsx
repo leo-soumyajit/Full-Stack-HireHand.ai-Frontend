@@ -338,11 +338,13 @@ export default function InterviewRoom() {
           setRemoteName("Interviewer");
         }
 
-        // Bind with a micro-delay to let React render the video element
-        // (video is always in DOM now, but just in case)
-        requestAnimationFrame(() => {
+        // IMPORTANT: We must delay binding until AFTER React has re-rendered
+        // (display:none → visible). requestAnimationFrame runs BEFORE React
+        // commits, so we use setTimeout to guarantee the video element is
+        // visible and Chrome's decoder will accept frames.
+        setTimeout(() => {
           bindRemoteStream(remoteStream);
-        });
+        }, 150);
       }
     });
     
@@ -605,16 +607,15 @@ export default function InterviewRoom() {
         <div className="flex-1 flex flex-col p-4 relative">
           {/* Remote Video (Main) */}
           <div className="flex-1 relative rounded-2xl overflow-hidden bg-[#1a1a2e] border border-white/5">
-            {/* VIDEO ELEMENT IS ALWAYS MOUNTED — never conditionally rendered.
-                This prevents React from destroying/recreating it on state changes
-                which was the root cause of black screens (srcObject lost on unmount). */}
+            {/* VIDEO IS ALWAYS VISIBLE — Chrome does NOT decode video for
+                display:none elements, causing permanent black screens.
+                The waiting overlay covers it when not connected. */}
             <video
               ref={remoteVideoRef}
               autoPlay
               playsInline
               muted  /* Audio plays via a separate headless <audio> element */
-              className="w-full h-full object-cover"
-              style={{ display: connectionStatus === "connected" ? "block" : "none" }}
+              className="absolute inset-0 w-full h-full object-cover"
             />
 
             {/* Waiting / Connecting overlay — shown OVER the video when not connected */}
