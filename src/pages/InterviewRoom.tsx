@@ -364,8 +364,13 @@ export default function InterviewRoom() {
     const stream = await initMedia();
     if (!stream) return;
 
+    // CRITICAL FIX: Clone the entire stream so Deepgram and PeerJS have 
+    // completely isolated MediaStreamTracks. Without this, Chrome's media 
+    // pipeline breaks WebRTC when MediaRecorder consumes the same track!
+    const deepgramStream = stream.clone();
+
     // Start Deepgram live transcription (Nova-2, Indian English)
-    deepgram.start(stream);
+    deepgram.start(deepgramStream);
 
     await initPeer(stream);
   };
@@ -373,8 +378,8 @@ export default function InterviewRoom() {
   // ── Bind remote stream to video + audio ─────────────────────────────
   // Helper function that can be called both from useEffect AND directly
   const bindRemoteStream = useCallback((stream: MediaStream) => {
-    // Bind video
-    if (remoteVideoRef.current) {
+    // Bind video ONLY if stream is different to avoid AbortError spam on play()
+    if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== stream) {
       console.log("🎥 Binding remote stream to video element");
       remoteVideoRef.current.srcObject = stream;
       remoteVideoRef.current.volume = 1.0;
@@ -383,9 +388,11 @@ export default function InterviewRoom() {
     
     // Create or update audio element for reliable remote audio
     if (remoteAudioRef.current) {
-      // Update existing audio element with new stream
-      remoteAudioRef.current.srcObject = stream;
-      remoteAudioRef.current.play().catch(e => console.error("Audio re-play prevented:", e));
+      // Update existing audio element with new stream ONLY if different
+      if (remoteAudioRef.current.srcObject !== stream) {
+        remoteAudioRef.current.srcObject = stream;
+        remoteAudioRef.current.play().catch(e => console.error("Audio re-play prevented:", e));
+      }
     } else {
       const audioEl = document.createElement('audio');
       audioEl.autoplay = true;
