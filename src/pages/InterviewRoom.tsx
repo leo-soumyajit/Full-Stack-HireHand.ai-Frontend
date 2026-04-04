@@ -62,7 +62,7 @@ export default function InterviewRoom() {
   const [remoteName, setRemoteName] = useState("");
 
   const [linkCopied, setLinkCopied] = useState(false);
-  const [remoteStreamReady, setRemoteStreamReady] = useState(0);
+  // remoteStreamReady removed — no longer needed with always-mounted video element
 
   // ── Refs ───────────────────────────────────────────────────────────
   const previewVideoRef = useRef<HTMLVideoElement>(null);
@@ -320,38 +320,34 @@ export default function InterviewRoom() {
   const handleCall = (call: MediaConnection) => {
     callRef.current = call;
     
-    // Safety timeout to reset if stream never arrives
-    const streamTimeout = setTimeout(() => {
-        if (connectionStatus !== "connected") {
-            console.log("Stream timeout reached, trying to reset answer.");
-        }
-    }, 10000);
+    // PeerJS fires "stream" TWICE per connection (once per track kind).
+    // We must only bind ONCE to avoid play() AbortError race conditions.
+    let streamBound = false;
 
     call.on("stream", (remoteStream) => {
       console.log("📡 Received remote stream! Tracks:", remoteStream.getTracks().map(t => `${t.kind}:${t.readyState}:enabled=${t.enabled}`));
-      clearTimeout(streamTimeout);
       
-      // Always update the ref to the latest stream
+      // Store the stream ref always (PeerJS reuses the same object)
       remoteStreamRef.current = remoteStream;
-      setConnectionStatus("connected");
-      // Bump counter so useEffect re-fires and re-binds video/audio
-      setRemoteStreamReady(prev => prev + 1);
-      
-      if (role === "guest") {
-          setRemoteName("Interviewer");
-      }
 
-      // DIRECT BINDING (robustness): Also try to bind immediately after short delay
-      // This catches edge cases where useEffect timing doesn't align with DOM
-      setTimeout(() => {
-        bindRemoteStream(remoteStream);
-      }, 200);
+      if (!streamBound) {
+        streamBound = true;
+        setConnectionStatus("connected");
+
+        if (role === "guest") {
+          setRemoteName("Interviewer");
+        }
+
+        // Bind with a micro-delay to let React render the video element
+        // (video is always in DOM now, but just in case)
+        requestAnimationFrame(() => {
+          bindRemoteStream(remoteStream);
+        });
+      }
     });
     
     call.on("close", () => {
       console.log("Call closed by remote peer");
-      // CRITICAL FIX: Only change state if THIS is the currently active call!
-      // This prevents old/dropped connections from unmounting the current active one
       if (callRef.current === call) {
         setConnectionStatus("disconnected");
       }
@@ -378,44 +374,43 @@ export default function InterviewRoom() {
   };
 
   // ── Bind remote stream to video + audio ─────────────────────────────
-  // Helper function that can be called both from useEffect AND directly
+  // Called ONCE per connection from handleCall's stream event.
+  // The <video> element is ALWAYS in the DOM (never conditionally rendered).
   const bindRemoteStream = useCallback((stream: MediaStream) => {
-    // Bind video ONLY if stream is different to avoid AbortError spam on play()
-    if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== stream) {
+    // ── Video ──
+    const videoEl = remoteVideoRef.current;
+    if (videoEl) {
       console.log("🎥 Binding remote stream to video element");
-      remoteVideoRef.current.srcObject = stream;
-      remoteVideoRef.current.volume = 1.0;
-      remoteVideoRef.current.play().catch(e => console.error("Video play prevented:", e));
+      videoEl.srcObject = stream;
+      // play() returns a promise — retry once on AbortError
+      const tryPlay = () => {
+        videoEl.play().catch((e) => {
+          if (e.name === "AbortError") {
+            // Browser interrupted play — retry after a tick
+            setTimeout(() => videoEl.play().catch(() => {}), 300);
+          }
+        });
+      };
+      tryPlay();
     }
-    
-    // Create or update audio element for reliable remote audio
-    if (remoteAudioRef.current) {
-      // Update existing audio element with new stream ONLY if different
-      if (remoteAudioRef.current.srcObject !== stream) {
-        remoteAudioRef.current.srcObject = stream;
-        remoteAudioRef.current.play().catch(e => console.error("Audio re-play prevented:", e));
-      }
-    } else {
+
+    // ── Audio (headless <audio> element for reliable playback) ──
+    if (!remoteAudioRef.current) {
       const audioEl = document.createElement('audio');
       audioEl.autoplay = true;
-      audioEl.srcObject = stream;
       audioEl.volume = 1.0;
       document.body.appendChild(audioEl);
       remoteAudioRef.current = audioEl;
-      audioEl.play().then(() => {
-        console.log("🔊 Remote audio playing!");
-      }).catch(e => console.error("Audio play prevented:", e));
     }
+    remoteAudioRef.current.srcObject = stream;
+    remoteAudioRef.current.play().then(() => {
+      console.log("🔊 Remote audio playing!");
+    }).catch(() => {});
   }, []);
 
-  // This effect fires on EVERY stream event (via remoteStreamReady counter)
+  // Cleanup audio element on full unmount
   useEffect(() => {
-    if (connectionStatus === "connected" && remoteStreamRef.current) {
-      bindRemoteStream(remoteStreamRef.current);
-    }
-    
     return () => {
-      // Cleanup audio element on unmount
       if (remoteAudioRef.current) {
         remoteAudioRef.current.pause();
         remoteAudioRef.current.srcObject = null;
@@ -423,7 +418,7 @@ export default function InterviewRoom() {
         remoteAudioRef.current = null;
       }
     };
-  }, [connectionStatus, remoteStreamReady, bindRemoteStream]);
+  }, []);
 
   // ── Toggle Controls ────────────────────────────────────────────────
   const toggleMic = () => {
@@ -610,10 +605,21 @@ export default function InterviewRoom() {
         <div className="flex-1 flex flex-col p-4 relative">
           {/* Remote Video (Main) */}
           <div className="flex-1 relative rounded-2xl overflow-hidden bg-[#1a1a2e] border border-white/5">
-            {connectionStatus === "connected" ? (
-              <video ref={remoteVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
+            {/* VIDEO ELEMENT IS ALWAYS MOUNTED — never conditionally rendered.
+                This prevents React from destroying/recreating it on state changes
+                which was the root cause of black screens (srcObject lost on unmount). */}
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              muted  /* Audio plays via a separate headless <audio> element */
+              className="w-full h-full object-cover"
+              style={{ display: connectionStatus === "connected" ? "block" : "none" }}
+            />
+
+            {/* Waiting / Connecting overlay — shown OVER the video when not connected */}
+            {connectionStatus !== "connected" && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-[2]">
                 <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-4">
                   <Users className="h-8 w-8 text-white/20" />
                 </div>
@@ -635,7 +641,7 @@ export default function InterviewRoom() {
             )}
 
             {remoteName && connectionStatus === "connected" && (
-              <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur text-white text-xs">
+              <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur text-white text-xs z-[3]">
                 {remoteName}
               </div>
             )}
