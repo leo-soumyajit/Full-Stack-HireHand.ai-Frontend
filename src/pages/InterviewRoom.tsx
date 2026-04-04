@@ -62,6 +62,7 @@ export default function InterviewRoom() {
   const [remoteName, setRemoteName] = useState("");
 
   const [linkCopied, setLinkCopied] = useState(false);
+  const [remoteStreamReady, setRemoteStreamReady] = useState(0);
 
   // ── Refs ───────────────────────────────────────────────────────────
   const previewVideoRef = useRef<HTMLVideoElement>(null);
@@ -326,16 +327,24 @@ export default function InterviewRoom() {
     }, 10000);
 
     call.on("stream", (remoteStream) => {
-      console.log("📡 Received remote stream! Tracks:", remoteStream.getTracks().map(t => `${t.kind}:${t.readyState}`));
+      console.log("📡 Received remote stream! Tracks:", remoteStream.getTracks().map(t => `${t.kind}:${t.readyState}:enabled=${t.enabled}`));
       clearTimeout(streamTimeout);
       
-      // Store stream in ref so useEffect can bind it after React renders the video element
+      // Always update the ref to the latest stream
       remoteStreamRef.current = remoteStream;
       setConnectionStatus("connected");
+      // Bump counter so useEffect re-fires and re-binds video/audio
+      setRemoteStreamReady(prev => prev + 1);
       
       if (role === "guest") {
           setRemoteName("Interviewer");
       }
+
+      // DIRECT BINDING (robustness): Also try to bind immediately after short delay
+      // This catches edge cases where useEffect timing doesn't align with DOM
+      setTimeout(() => {
+        bindRemoteStream(remoteStream);
+      }, 200);
     });
     
     call.on("close", () => {
@@ -361,30 +370,39 @@ export default function InterviewRoom() {
     await initPeer(stream);
   };
 
-  // ── Bind remote stream to video + audio AFTER React renders ─────────
+  // ── Bind remote stream to video + audio ─────────────────────────────
+  // Helper function that can be called both from useEffect AND directly
+  const bindRemoteStream = useCallback((stream: MediaStream) => {
+    // Bind video
+    if (remoteVideoRef.current) {
+      console.log("🎥 Binding remote stream to video element");
+      remoteVideoRef.current.srcObject = stream;
+      remoteVideoRef.current.volume = 1.0;
+      remoteVideoRef.current.play().catch(e => console.error("Video play prevented:", e));
+    }
+    
+    // Create or update audio element for reliable remote audio
+    if (remoteAudioRef.current) {
+      // Update existing audio element with new stream
+      remoteAudioRef.current.srcObject = stream;
+      remoteAudioRef.current.play().catch(e => console.error("Audio re-play prevented:", e));
+    } else {
+      const audioEl = document.createElement('audio');
+      audioEl.autoplay = true;
+      audioEl.srcObject = stream;
+      audioEl.volume = 1.0;
+      document.body.appendChild(audioEl);
+      remoteAudioRef.current = audioEl;
+      audioEl.play().then(() => {
+        console.log("🔊 Remote audio playing!");
+      }).catch(e => console.error("Audio play prevented:", e));
+    }
+  }, []);
+
+  // This effect fires on EVERY stream event (via remoteStreamReady counter)
   useEffect(() => {
     if (connectionStatus === "connected" && remoteStreamRef.current) {
-      // Bind video
-      if (remoteVideoRef.current) {
-        console.log("🎥 Binding remote stream to video element");
-        remoteVideoRef.current.srcObject = remoteStreamRef.current;
-        remoteVideoRef.current.volume = 1.0;
-        remoteVideoRef.current.play().catch(e => console.error("Video play prevented:", e));
-      }
-      
-      // CRITICAL: Create a separate audio element for reliable audio playback
-      // This bypasses browser autoplay restrictions on the video element
-      if (!remoteAudioRef.current) {
-        const audioEl = document.createElement('audio');
-        audioEl.autoplay = true;
-        audioEl.srcObject = remoteStreamRef.current;
-        audioEl.volume = 1.0;
-        document.body.appendChild(audioEl);
-        remoteAudioRef.current = audioEl;
-        audioEl.play().then(() => {
-          console.log("🔊 Remote audio playing!");
-        }).catch(e => console.error("Audio play prevented:", e));
-      }
+      bindRemoteStream(remoteStreamRef.current);
     }
     
     return () => {
@@ -396,7 +414,7 @@ export default function InterviewRoom() {
         remoteAudioRef.current = null;
       }
     };
-  }, [connectionStatus]);
+  }, [connectionStatus, remoteStreamReady, bindRemoteStream]);
 
   // ── Toggle Controls ────────────────────────────────────────────────
   const toggleMic = () => {
