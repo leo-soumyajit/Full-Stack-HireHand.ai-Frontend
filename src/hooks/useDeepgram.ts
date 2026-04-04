@@ -9,6 +9,26 @@ import { useRef, useCallback } from "react";
  * 3. Feed raw audio blobs from MediaRecorder every 250ms.
  * 4. Deepgram returns transcript results in real-time.
  */
+
+// Find a supported audio MIME type for MediaRecorder
+function getSupportedMimeType(): string {
+  const types = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+    "audio/mpeg",
+    "",  // empty = browser default
+  ];
+  for (const t of types) {
+    if (t === "" || MediaRecorder.isTypeSupported(t)) {
+      console.log(`🎙️ Using MediaRecorder MIME: "${t || "browser-default"}"`);
+      return t;
+    }
+  }
+  return "";
+}
+
 export function useDeepgram(onTranscript: (text: string, isFinal: boolean) => void) {
   const socketRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -21,16 +41,19 @@ export function useDeepgram(onTranscript: (text: string, isFinal: boolean) => vo
 
     try {
       // 1. Fetch temporary token from our secure backend
+      console.log("🔑 Fetching Deepgram token...");
       const res = await fetch(`${API_BASE}/api/deepgram/token`);
-      if (!res.ok) throw new Error("Failed to fetch Deepgram token");
+      if (!res.ok) throw new Error(`Token fetch failed: ${res.status}`);
       const { key } = await res.json();
       if (!key) throw new Error("Empty Deepgram token received");
+      console.log("🔑 Deepgram token acquired");
 
       // 2. Open WebSocket to Deepgram
-      // model=nova-2-general for best accuracy
-      // language=en-IN for Indian English accent support
-      // smart_format=true for punctuation and formatting
-      // interim_results=true for live typing indicator
+      // model=nova-2-general → best accuracy
+      // language=en-IN → Indian English accent support  
+      // smart_format=true → auto punctuation & formatting
+      // interim_results=true → live typing indicator
+      // endpointing=300 → faster sentence breaks
       const dgUrl = `wss://api.deepgram.com/v1/listen?model=nova-2-general&language=en-IN&smart_format=true&interim_results=true&punctuate=true&endpointing=300`;
 
       const socket = new WebSocket(dgUrl, ["token", key]);
@@ -40,11 +63,13 @@ export function useDeepgram(onTranscript: (text: string, isFinal: boolean) => vo
         console.log("🟢 Deepgram WebSocket OPEN — streaming audio");
         isRunningRef.current = true;
 
-        // 3. Start MediaRecorder to capture mic audio as webm/opus blobs
+        // 3. Start MediaRecorder with a supported MIME type
         try {
-          const mediaRecorder = new MediaRecorder(stream, {
-            mimeType: "audio/webm;codecs=opus",
-          });
+          const mimeType = getSupportedMimeType();
+          const options: MediaRecorderOptions = {};
+          if (mimeType) options.mimeType = mimeType;
+
+          const mediaRecorder = new MediaRecorder(stream, options);
           mediaRecorderRef.current = mediaRecorder;
 
           mediaRecorder.addEventListener("dataavailable", (event: BlobEvent) => {
@@ -55,8 +80,11 @@ export function useDeepgram(onTranscript: (text: string, isFinal: boolean) => vo
 
           // Send audio chunks every 250ms for low-latency transcription
           mediaRecorder.start(250);
+          console.log("🎙️ MediaRecorder started — sending audio to Deepgram");
         } catch (recErr) {
           console.error("MediaRecorder setup failed:", recErr);
+          // Ultimate fallback: use AudioContext to send raw PCM
+          startRawAudioFallback(stream, socket);
         }
       };
 
@@ -68,8 +96,8 @@ export function useDeepgram(onTranscript: (text: string, isFinal: boolean) => vo
           if (transcript && transcript.trim()) {
             onTranscript(transcript, data.is_final === true);
           }
-        } catch (parseErr) {
-          // Ignore non-JSON messages (e.g. metadata)
+        } catch {
+          // Ignore non-JSON messages (metadata, keep-alives)
         }
       };
 
@@ -107,4 +135,38 @@ export function useDeepgram(onTranscript: (text: string, isFinal: boolean) => vo
   }, []);
 
   return { start, stop };
+}
+
+/**
+ * Fallback: If MediaRecorder doesn't support any webm/ogg type,
+ * use Web Audio API to send raw Linear16 PCM at 16kHz directly.
+ * This works on ALL browsers including Safari.
+ */
+function startRawAudioFallback(stream: MediaStream, socket: WebSocket) {
+  console.log("⚠️ Falling back to raw PCM audio via AudioContext");
+  
+  try {
+    const audioContext = new AudioContext({ sampleRate: 16000 });
+    const source = audioContext.createMediaStreamSource(stream);
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+    processor.onaudioprocess = (e) => {
+      if (socket.readyState !== WebSocket.OPEN) return;
+      
+      const inputData = e.inputBuffer.getChannelData(0);
+      // Convert float32 to int16
+      const int16 = new Int16Array(inputData.length);
+      for (let i = 0; i < inputData.length; i++) {
+        const s = Math.max(-1, Math.min(1, inputData[i]));
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+      socket.send(int16.buffer);
+    };
+
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+    console.log("🎙️ Raw PCM audio streaming started (16kHz Linear16)");
+  } catch (err) {
+    console.error("Raw audio fallback also failed:", err);
+  }
 }
