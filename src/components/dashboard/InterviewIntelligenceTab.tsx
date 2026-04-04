@@ -695,7 +695,7 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
       {viewMode === "chat" ? (
         /* ── Chat View ────────────────────────────────────────────── */
         <Card className="glass-card">
-          <CardContent className="p-4 max-h-[500px] overflow-y-auto space-y-3">
+          <CardContent className="p-4 space-y-3" style={{ maxHeight: "65vh", overflowY: "scroll", overscrollBehavior: "contain" }}>
             {chatMessages.length === 0 ? (
               <p className="text-muted-foreground text-sm text-center py-8">No transcript available</p>
             ) : (
