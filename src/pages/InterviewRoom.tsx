@@ -138,49 +138,74 @@ export default function InterviewRoom() {
   const reconnectTimerRef = useRef<number | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
-
-  const dataConnRef = useRef<any>(null);
-  const dataConnOpenRef = useRef(false);
-  const pendingTranscriptsRef = useRef<any[]>([]);
+  const transcriptLastFetchRef = useRef<string | null>(null);
 
   // ── Speech Recognition ─────────────────────────────────────────────
-  const handleData = useCallback((data: any) => {
-    if (data && data.type === "transcript") {
-      setTranscript(prev => {
-        // Sort might be needed, but appending is generally fine for realtime
-        return [...prev, data.entry].sort((a,b) => a.id - b.id);
-      });
-    }
-  }, []);
 
   const handleTranscript = useCallback((text: string, isFinal: boolean) => {
     if (isFinal) {
-      const now = new Date();
-      const ts = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      const ts = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
       const entry: TranscriptEntry = { id: Date.now() + Math.random(), text: text.trim(), timestamp: ts, isFinal: true, speaker: userName };
       
-      setTranscript(prev => [...prev, entry].sort((a,b) => a.id - b.id));
+      setTranscript(prev => [...prev, entry]);
       setInterimText("");
       
-      // Send to remote peer via data channel
-      if (dataConnRef.current && dataConnOpenRef.current) {
-         try {
-           dataConnRef.current.send({ type: "transcript", entry });
-           console.log(`📤 Sent transcript to peer: "${entry.text}"`);
-         } catch (e) {
-           console.warn("Failed to send transcript:", e);
-         }
-      } else {
-        // Buffer it and send when connection opens
-        pendingTranscriptsRef.current.push(entry);
-        console.log(`📦 Buffered transcript (channel not open yet): "${entry.text}"`);
-      }
+      // POST to backend API to share securely
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      fetch(`${API_BASE}/api/live-transcript`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          room_id: roomId,
+          speaker: userName,
+          text: entry.text,
+          timestamp: ts
+        })
+      }).catch(e => console.warn("Failed to POST transcript to API", e));
+      
     } else {
       setInterimText(text);
     }
-  }, [userName]);
+  }, [userName, roomId]);
 
   const speechRecognition = useSpeechRecognition(handleTranscript);
+
+  // ── Poll for remote transcripts ────────────────────────────────────
+  useEffect(() => {
+    if (connectionStatus !== "connected") return;
+    
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    
+    const interval = window.setInterval(async () => {
+       try {
+          const params = transcriptLastFetchRef.current ? `?after=${transcriptLastFetchRef.current}` : "";
+          const res = await fetch(`${API_BASE}/api/live-transcript/${roomId}${params}`);
+          if (res.ok) {
+             const data = await res.json();
+             if (data.length > 0) {
+                transcriptLastFetchRef.current = data[data.length - 1].created_at;
+                const otherSpeakerEntries = data
+                    .filter((d: any) => d.speaker !== userName)
+                    .map((d: any) => ({
+                        id: Date.now() + Math.random(),
+                        text: d.text,
+                        timestamp: d.timestamp,
+                        isFinal: true,
+                        speaker: d.speaker
+                    }));
+                
+                if (otherSpeakerEntries.length > 0) {
+                    setTranscript(prev => [...prev, ...otherSpeakerEntries]);
+                }
+             }
+          }
+       } catch (e) {
+          console.warn("Polling error:", e);
+       }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [connectionStatus, roomId, userName]);
 
   // ── Auto-scroll transcript ─────────────────────────────────────────
   useEffect(() => {
@@ -284,38 +309,7 @@ export default function InterviewRoom() {
         setConnectionStatus("connecting");
         const call = peer.call(`${roomId}-host`, stream, { metadata: { name: userName } });
         handleCall(call);
-        
-        // Setup data connection for transcripts
-        const dataConn = peer.connect(`${roomId}-host`, { reliable: true });
-        dataConnRef.current = dataConn;
-        dataConn.on("open", () => {
-          console.log("🔗 Guest: Data channel to host is OPEN");
-          dataConnOpenRef.current = true;
-          // Flush any buffered transcripts
-          pendingTranscriptsRef.current.forEach(entry => {
-            dataConn.send({ type: "transcript", entry });
-          });
-          pendingTranscriptsRef.current = [];
-        });
-        dataConn.on("data", handleData);
-        dataConn.on("close", () => { dataConnOpenRef.current = false; });
       }
-    });
-
-    peer.on("connection", (conn) => {
-      console.log("🔗 Host: Data connection from guest!");
-      dataConnRef.current = conn;
-      conn.on("open", () => {
-        console.log("🔗 Host: Data channel is OPEN");
-        dataConnOpenRef.current = true;
-        // Flush any buffered transcripts
-        pendingTranscriptsRef.current.forEach(entry => {
-          conn.send({ type: "transcript", entry });
-        });
-        pendingTranscriptsRef.current = [];
-      });
-      conn.on("data", handleData);
-      conn.on("close", () => { dataConnOpenRef.current = false; });
     });
 
     peer.on("call", (call) => {
