@@ -31,6 +31,7 @@ interface TranscriptEntry {
   text: string;
   timestamp: string;
   isFinal: boolean;
+  speaker?: string;
 }
 
 type ConnectionStatus = "connecting" | "waiting" | "connected" | "disconnected" | "failed";
@@ -136,17 +137,34 @@ export default function InterviewRoom() {
   const timerRef = useRef<number | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
 
+  const dataConnRef = useRef<any>(null);
+
   // ── Speech Recognition ─────────────────────────────────────────────
+  const handleData = useCallback((data: any) => {
+    if (data && data.type === "transcript") {
+      setTranscript(prev => {
+        // Sort might be needed, but appending is generally fine for realtime
+        return [...prev, data.entry].sort((a,b) => a.id - b.id);
+      });
+    }
+  }, []);
+
   const handleTranscript = useCallback((text: string, isFinal: boolean) => {
     if (isFinal) {
       const now = new Date();
       const ts = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      setTranscript(prev => [...prev, { id: entryIdRef.current++, text: text.trim(), timestamp: ts, isFinal: true }]);
+      const entry: TranscriptEntry = { id: Date.now() + Math.random(), text: text.trim(), timestamp: ts, isFinal: true, speaker: userName };
+      
+      setTranscript(prev => [...prev, entry].sort((a,b) => a.id - b.id));
       setInterimText("");
+      
+      if (dataConnRef.current && dataConnRef.current.open) {
+         dataConnRef.current.send({ type: "transcript", entry });
+      }
     } else {
       setInterimText(text);
     }
-  }, []);
+  }, [userName]);
 
   const speechRecognition = useSpeechRecognition(handleTranscript);
 
@@ -240,7 +258,18 @@ export default function InterviewRoom() {
         setConnectionStatus("connecting");
         const call = peer.call(`${roomId}-host`, stream, { metadata: { name: userName } });
         handleCall(call);
+        
+        // Setup data connection for transcripts
+        const dataConn = peer.connect(`${roomId}-host`);
+        dataConnRef.current = dataConn;
+        dataConn.on("data", handleData);
       }
+    });
+
+    peer.on("connection", (conn) => {
+      console.log("🔗 Host: Data connection established!");
+      dataConnRef.current = conn;
+      conn.on("data", handleData);
     });
 
     peer.on("call", (call) => {
@@ -378,8 +407,8 @@ export default function InterviewRoom() {
     setIsEnding(true);
     speechRecognition.stop();
 
-    // Build full transcript text
-    const fullTranscript = transcript.map(e => `[${e.timestamp}] ${e.text}`).join("\n");
+    // Build full transcript text with speaker diarization
+    const fullTranscript = transcript.map(e => `[${e.timestamp}] ${e.speaker || "Unknown"}: ${e.text}`).join("\n");
 
     // Cleanup media
     localStreamRef.current?.getTracks().forEach(t => t.stop());
@@ -612,9 +641,12 @@ export default function InterviewRoom() {
 
                 {transcript.map((entry) => (
                   <div key={entry.id} className="group">
-                    <div className="flex items-start gap-2">
+                    <div className="flex items-start gap-3">
                       <span className="text-[10px] text-white/20 font-mono mt-1 shrink-0">{entry.timestamp}</span>
-                      <p className="text-sm text-white/80 leading-relaxed">{entry.text}</p>
+                      <div>
+                        <span className="text-[11px] font-semibold text-indigo-400 block mb-0.5">{entry.speaker || "Unknown"}</span>
+                        <p className="text-sm text-white/80 leading-relaxed">{entry.text}</p>
+                      </div>
                     </div>
                   </div>
                 ))}
