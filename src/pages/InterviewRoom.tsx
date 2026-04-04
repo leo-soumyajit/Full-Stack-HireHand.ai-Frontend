@@ -211,9 +211,9 @@ export default function InterviewRoom() {
     };
   }, [preJoin]);
 
-  // ── Initialize PeerJS ──────────────────────────────────────────────
   const initPeer = async (stream: MediaStream) => {
-    const peerId = role === "host" ? `${roomId}-host` : `${roomId}-guest-${Date.now()}`;
+    // Force a unique guest ID so they don't overlap, but Host MUST be static
+    const peerId = role === "host" ? `${roomId}-host` : `${roomId}-guest-${Math.floor(Math.random()*10000)}`;
 
     const peer = new Peer(peerId, {
       config: {
@@ -222,18 +222,21 @@ export default function InterviewRoom() {
           { urls: "stun:stun1.l.google.com:19302" },
           { urls: "stun:stun2.l.google.com:19302" },
           { urls: "stun:stun3.l.google.com:19302" },
+          { urls: "stun:stun4.l.google.com:19302" },
         ],
       },
+      debug: 2
     });
 
     peerRef.current = peer;
 
     peer.on("open", () => {
-      console.log(`✅ Peer connected as: ${peerId}`);
+      console.log(`✅ Peer connected to signaling server: ${peerId}`);
       if (role === "host") {
         setConnectionStatus("waiting");
       } else {
-        // Guest: Call the host
+        // Guest: Call the static host ID immediately
+        console.log("Guest: Calling host...");
         setConnectionStatus("connecting");
         const call = peer.call(`${roomId}-host`, stream, { metadata: { name: userName } });
         handleCall(call);
@@ -241,8 +244,16 @@ export default function InterviewRoom() {
     });
 
     peer.on("call", (call) => {
-      console.log("📞 Incoming call from:", call.peer);
-      setRemoteName(call.metadata?.name || "Participant");
+      console.log("📞 Host: Incoming call from guest!", call.peer);
+      // Host receives call. Give feedback immediately.
+      setConnectionStatus("connecting");
+      if (call.metadata && call.metadata.name) {
+         setRemoteName(call.metadata.name);
+      } else {
+         setRemoteName("Candidate");
+      }
+      
+      // Answer the call with the local stream
       call.answer(stream);
       handleCall(call);
     });
@@ -250,18 +261,22 @@ export default function InterviewRoom() {
     peer.on("error", (err: any) => {
       console.error("Peer error:", err);
       if (err.type === "peer-unavailable") {
+        // Host isn't there yet.
         setConnectionStatus("waiting");
         
         // ── Auto-retry calling the host if guest joined first ──
         if (role === "guest" && connectionStatus !== "connected") {
-          console.log("Host not here yet... retrying in 3s");
-          setTimeout(() => {
-            if (peerRef.current && !peerRef.current.destroyed) {
-              const call = peerRef.current.call(`${roomId}-host`, localStreamRef.current!, { metadata: { name: userName } });
+          console.log("Host not alive yet... retrying in 3s");
+          clearTimeout(reconnectTimerRef.current || 0);
+          reconnectTimerRef.current = window.setTimeout(() => {
+            if (peerRef.current && !peerRef.current.destroyed && localStreamRef.current) {
+              const call = peerRef.current.call(`${roomId}-host`, localStreamRef.current, { metadata: { name: userName } });
               handleCall(call);
             }
           }, 3000);
         }
+      } else if (err.type === "network" || err.type === "disconnected") {
+          setConnectionStatus("failed");
       }
     });
 
@@ -285,17 +300,42 @@ export default function InterviewRoom() {
 
   const handleCall = (call: MediaConnection) => {
     callRef.current = call;
+    
+    // Safety timeout to reset if stream never arrives
+    const streamTimeout = setTimeout(() => {
+        if (connectionStatus !== "connected") {
+            console.log("Stream timeout reached, trying to reset answer.");
+        }
+    }, 10000);
+
     call.on("stream", (remoteStream) => {
+      console.log("📡 Received remote stream!");
+      clearTimeout(streamTimeout);
+      
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remoteStream;
+        // Force play just in case autoPlay is blocked by browser policies
+        remoteVideoRef.current.play().catch(e => console.error("Play prevented:", e));
       }
       setConnectionStatus("connected");
+      
+      // If we are Host, we don't naturally get remote metadata name because Guest didn't send it in 'answer'.
+      // Wait, Host DOES get name from call.metadata on creation! So Host is fine. 
+      // If we are Guest, Host answered but Host's answer() doesn't carry metadata. 
+      // We will just label the Host as "Interviewer" if we don't have a name.
+      if (role === "guest") {
+          setRemoteName("Interviewer");
+      }
     });
+    
     call.on("close", () => {
+      console.log("Call closed by remote peer");
       setConnectionStatus("disconnected");
     });
+    
     call.on("error", (err) => {
       console.error("Call error:", err);
+      setConnectionStatus("failed");
     });
   };
 
