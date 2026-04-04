@@ -4,12 +4,14 @@ import { AnimatePresence } from "framer-motion";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
+import { PositionsView } from "@/components/dashboard/PositionsView";
 import { PositionDetail } from "@/components/dashboard/PositionDetail";
 import { AllCandidatesView } from "@/components/dashboard/AllCandidatesView";
 import { JDInput } from "@/components/dashboard/JDInput";
 import { LoadingState } from "@/components/dashboard/LoadingState";
+import { CompanyProfile } from "@/components/dashboard/CompanyProfile";
 import { QuestionList } from "@/components/dashboard/QuestionList";
-import { SchedulingTab } from "@/components/dashboard/SchedulingTab"; // Added import
+import { SchedulingTab } from "@/components/dashboard/SchedulingTab";
 import { Question } from "@/types/questions";
 import { generateQuestionsFromJD } from "@/lib/openrouter";
 import { useToast } from "@/hooks/use-toast";
@@ -17,13 +19,14 @@ import { useToast } from "@/hooks/use-toast";
 // Extended view type that covers all sidebar sections
 type DashboardView =
   | "home"
-  | "positions"        // sidebar → Positions tab (same as home but filtered)
-  | "candidates"       // sidebar → All Candidates view
+  | "positions"
+  | "candidates"
   | "position-detail"
   | "input"
   | "loading"
   | "results"
-  | "scheduling";
+  | "scheduling"
+  | "profile";
 
 const Dashboard = () => {
   const { toast } = useToast();
@@ -107,13 +110,11 @@ const Dashboard = () => {
       else if (section === "positions") prev.set("v", "positions");
       else if (section === "candidates") prev.set("v", "candidates");
       else if (section === "scheduling") prev.set("v", "scheduling");
+      else if (section === "profile") prev.set("v", "profile");
       
       return prev;
     });
   };
-
-  // Positions view is identical to home (DashboardHome already has tabs for Open/Closed)
-  const showHome = view === "home" || view === "positions";
 
   return (
     <div className="flex min-h-screen w-full bg-background bg-dot-grid">
@@ -130,8 +131,16 @@ const Dashboard = () => {
 
         <main className="flex-1 p-6">
           <AnimatePresence mode="wait">
-            {showHome && (
-              <DashboardHome key="home" onViewPosition={handleViewPosition} />
+            {view === "home" && (
+              <DashboardHome
+                key="home"
+                onViewPosition={handleViewPosition}
+                onNavigate={handleSectionChange}
+                onPasteJD={handlePasteJD}
+              />
+            )}
+            {view === "positions" && (
+              <PositionsView key="positions" onViewPosition={handleViewPosition} />
             )}
             {view === "candidates" && (
               <AllCandidatesView key="candidates" onViewCandidate={handleViewCandidate} />
@@ -145,6 +154,9 @@ const Dashboard = () => {
             )}
             {view === "scheduling" && (
               <SchedulingTab key="scheduling" />
+            )}
+            {view === "profile" && (
+              <CompanyProfile key="profile" />
             )}
             {view === "input" && (
               <JDInput key="input" onGenerate={handleGenerate} isGenerating={false} />

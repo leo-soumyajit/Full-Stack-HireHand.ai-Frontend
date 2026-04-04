@@ -278,18 +278,25 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
 }
 
 function OverviewTab({ position }: { position: ApiPosition }) {
+  const pipelineHealth = position.candidates_count === 0 ? "Empty" : position.candidates_count < 4 ? "Building" : "Active";
+  const pipelineColor = pipelineHealth === "Empty" ? "text-muted-foreground" : pipelineHealth === "Building" ? "text-amber-400" : "text-emerald-400";
+  const pipelineBg = pipelineHealth === "Empty" ? "bg-muted/10" : pipelineHealth === "Building" ? "bg-amber-500/10" : "bg-emerald-500/10";
+  const pipelineBorder = pipelineHealth === "Empty" ? "border-border/20" : pipelineHealth === "Building" ? "border-amber-500/20" : "border-emerald-500/20";
+
   const stats = [
     { label: "Total Candidates", value: position.candidates_count, icon: Users, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" },
-    { label: "Avg Psych Score", value: "—", icon: Target, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", extra: "Awaiting data" },
-    { label: "Pipeline Health", value: "Optimal", icon: Activity, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" },
-    { label: "Risk Indicators", value: position.risk_flag ? "1 Active" : "Clear", icon: AlertTriangle, color: position.risk_flag ? "text-red-400" : "text-emerald-400", bg: position.risk_flag ? "bg-red-500/10" : "bg-emerald-500/10", border: position.risk_flag ? "border-red-500/20" : "border-emerald-500/20" },
+    { label: "Shortlisted", value: position.shortlisted_count, icon: Target, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", extra: position.candidates_count > 0 ? `${Math.round((position.shortlisted_count / position.candidates_count) * 100)}% of total` : undefined },
+    { label: "Pipeline Health", value: pipelineHealth, icon: Activity, color: pipelineColor, bg: pipelineBg, border: pipelineBorder },
+    { label: "Risk Indicators", value: position.risk_flag ? "Flagged" : "Clear", icon: AlertTriangle, color: position.risk_flag ? "text-red-400" : "text-emerald-400", bg: position.risk_flag ? "bg-red-500/10" : "bg-emerald-500/10", border: position.risk_flag ? "border-red-500/20" : "border-emerald-500/20" },
   ];
+
+  const screenedPct = position.candidates_count > 0 ? Math.round((position.shortlisted_count / position.candidates_count) * 100) : 0;
 
   const funnel = [
     { stage: "Sourced", count: position.candidates_count, pct: 100, icon: Users, color: "text-blue-400", bg: "bg-blue-500", glow: "shadow-[0_0_15px_rgba(59,130,246,0.5)]" },
-    { stage: "Evaluated (Psych)", count: Math.round(position.candidates_count * 0.6), pct: 60, icon: Brain, color: "text-purple-400", bg: "bg-purple-500", glow: "shadow-[0_0_15px_rgba(168,85,247,0.5)]" },
-    { stage: "Interview Scheduled", count: Math.round(position.candidates_count * 0.3), pct: 30, icon: Video, color: "text-pink-400", bg: "bg-pink-500", glow: "shadow-[0_0_15px_rgba(236,72,153,0.5)]" },
-    { stage: "Offer Released", count: Math.round(position.candidates_count * 0.1), pct: 10, icon: CheckCircle2, color: "text-emerald-400", bg: "bg-emerald-500", glow: "shadow-[0_0_15px_rgba(16,185,129,0.5)]" },
+    { stage: "Screened / Shortlisted", count: position.shortlisted_count, pct: screenedPct, icon: Brain, color: "text-purple-400", bg: "bg-purple-500", glow: "shadow-[0_0_15px_rgba(168,85,247,0.5)]" },
+    { stage: "Interview Stage", count: 0, pct: 0, icon: Video, color: "text-pink-400", bg: "bg-pink-500", glow: "shadow-[0_0_15px_rgba(236,72,153,0.5)]" },
+    { stage: "Offer Released", count: 0, pct: 0, icon: CheckCircle2, color: "text-emerald-400", bg: "bg-emerald-500", glow: "shadow-[0_0_15px_rgba(16,185,129,0.5)]" },
   ];
 
   const container = {
@@ -299,7 +306,7 @@ function OverviewTab({ position }: { position: ApiPosition }) {
   
   const item = {
     hidden: { opacity: 0, scale: 0.95, y: 15 },
-    show: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    show: { opacity: 1, scale: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
   };
 
   return (
@@ -341,8 +348,8 @@ function OverviewTab({ position }: { position: ApiPosition }) {
                   </h3>
                   <p className="text-sm text-muted-foreground mt-1">Real-time candidate progression funnel</p>
                 </div>
-                <Badge className="bg-primary/10 text-primary border-primary/20 cursor-default">
-                  <Activity className="h-3 w-3 mr-1" /> Active
+                <Badge className={`cursor-default ${position.candidates_count > 0 ? 'bg-primary/10 text-primary border-primary/20' : 'bg-muted/50 text-muted-foreground border-border/30'}`}>
+                  <Activity className="h-3 w-3 mr-1" /> {position.candidates_count > 0 ? 'Active' : 'Empty'}
                 </Badge>
               </div>
 
@@ -364,7 +371,7 @@ function OverviewTab({ position }: { position: ApiPosition }) {
                     <div className="h-4 w-full rounded-full bg-muted/30 overflow-hidden relative border border-border/20 backdrop-blur-sm">
                       <motion.div
                         initial={{ width: 0, opacity: 0 }}
-                        animate={{ width: `${f.pct}%`, opacity: 1 }}
+                        animate={{ width: `${Math.max(f.pct, f.count > 0 ? 3 : 0)}%`, opacity: 1 }}
                         transition={{ duration: 1.2, delay: 0.2 + (i * 0.15), ease: "easeOut" }}
                         className={`absolute top-0 left-0 h-full rounded-full ${f.bg} ${f.glow} relative overflow-hidden`}
                       >
@@ -378,7 +385,7 @@ function OverviewTab({ position }: { position: ApiPosition }) {
           </Card>
         </motion.div>
 
-        {/* AI Recommendations Panel */}
+        {/* AI Insights Panel — Data-driven */}
         <motion.div variants={item} className="lg:col-span-1">
           <Card className="h-full border-border/40 bg-gradient-to-b from-primary/[0.02] to-transparent backdrop-blur-xl relative overflow-hidden group">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-primary/50 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
@@ -397,33 +404,48 @@ function OverviewTab({ position }: { position: ApiPosition }) {
               </div>
 
               <div className="space-y-4">
+                {/* Pipeline insight — real data */}
                 <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl bg-background/60 border border-border/50 transition-all cursor-default shadow-sm hover:shadow-md">
                   <div className="flex items-start gap-3">
                     <Activity className="h-4 w-4 text-emerald-400 mt-1 shrink-0" />
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Pipeline Velocity</p>
-                      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">Candidates are moving through the Psychometric stage <span className="text-emerald-400 font-medium">24% faster</span> than the global average.</p>
+                      <p className="text-sm font-semibold text-foreground">Pipeline Status</p>
+                      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                        {position.candidates_count === 0
+                          ? "No candidates sourced yet. Add candidates to start building your pipeline."
+                          : position.shortlisted_count > 0
+                            ? <>{position.shortlisted_count} out of {position.candidates_count} candidates have been <span className="text-emerald-400 font-medium">screened and shortlisted</span>.</>
+                            : <>{position.candidates_count} candidate{position.candidates_count > 1 ? 's' : ''} sourced. <span className="text-amber-400 font-medium">Run screening</span> to advance the pipeline.</>
+                        }
+                      </p>
                     </div>
                   </div>
                 </motion.div>
 
+                {/* Quality insight — real data */}
                 <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl bg-background/60 border border-border/50 transition-all cursor-default shadow-sm hover:shadow-md">
                   <div className="flex items-start gap-3">
                     <Target className="h-4 w-4 text-primary mt-1 shrink-0" />
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Quality of Hire Model</p>
-                      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">Current candidates show <span className="text-primary font-medium">strong alignment</span> with the role's required behavioral traits.</p>
+                      <p className="text-sm font-semibold text-foreground">Quality Signals</p>
+                      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                        {position.shortlisted_count > 0
+                          ? <>Screening rate is <span className="text-primary font-medium">{screenedPct}%</span>. {screenedPct >= 50 ? "Strong candidate pool quality." : "Consider refining sourcing criteria."}</>
+                          : "Run psychometric evaluations on candidates to unlock quality insights."
+                        }
+                      </p>
                     </div>
                   </div>
                 </motion.div>
 
+                {/* Risk insight — real data */}
                 {position.risk_flag ? (
                   <motion.div whileHover={{ scale: 1.02 }} className="p-4 rounded-xl bg-red-500/5 border border-red-500/20 transition-all cursor-default shadow-sm hover:shadow-md">
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="h-4 w-4 text-red-500 mt-1 shrink-0" />
                       <div>
                         <p className="text-sm font-semibold text-red-500">Risk Detected</p>
-                        <p className="text-xs text-red-500/80 mt-1.5 leading-relaxed">SLA for Interview stage is approaching breach. Immediate action recommended.</p>
+                        <p className="text-xs text-red-500/80 mt-1.5 leading-relaxed">Flag: {position.risk_flag}. Review and take action to mitigate.</p>
                       </div>
                     </div>
                   </motion.div>
@@ -432,8 +454,8 @@ function OverviewTab({ position }: { position: ApiPosition }) {
                     <div className="flex items-start gap-3">
                       <ShieldCheck className="h-4 w-4 text-emerald-500 mt-1 shrink-0" />
                       <div>
-                        <p className="text-sm font-semibold text-emerald-500">Zero Active Risks</p>
-                        <p className="text-xs text-emerald-500/80 mt-1.5 leading-relaxed">All SLAs are within acceptable parameters. No bottlenecks identified.</p>
+                        <p className="text-sm font-semibold text-emerald-500">No Active Risks</p>
+                        <p className="text-xs text-emerald-500/80 mt-1.5 leading-relaxed">All parameters are within acceptable range. No bottlenecks identified.</p>
                       </div>
                     </div>
                   </motion.div>

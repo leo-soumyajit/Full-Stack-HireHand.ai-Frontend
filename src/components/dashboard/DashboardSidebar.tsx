@@ -16,6 +16,7 @@ import {
   Menu,
   FileText,
   KeyRound,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ const mainNav = [
 ];
 
 const adminNav = [
+  { icon: User, label: "Profile & Settings", action: "profile" },
   { icon: Settings, label: "Config", action: "config" },
   { icon: Shield, label: "Audit & Governance", action: "audit" },
   { icon: KeyRound, label: "Change Password", action: "password" },
@@ -132,21 +134,31 @@ export function DashboardSidebar({
           <p className={cn("text-[10px] uppercase tracking-widest text-muted-foreground mb-2", isCollapsed && "sr-only")}>
             Admin
           </p>
-          {adminNav.map((item) => (
+          {adminNav.map((item) => {
+            const isActive = activeSection === item.action;
+            return (
             <button
               key={item.label}
               onClick={() => {
                 if (item.action === "password") {
                   setPasswordModalOpen(true);
+                } else if (item.action === "profile") {
+                  onSectionChange?.("profile");
                 }
                 if (isMobile) setMobileOpen(false);
               }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-sm font-medium"
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-300 text-sm font-medium",
+                isActive
+                  ? "bg-primary/10 text-primary border border-primary/20 shadow-sm"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
             >
               <item.icon className="h-5 w-5 shrink-0" />
               {!isCollapsed && <span>{item.label}</span>}
             </button>
-          ))}
+            );
+          })}
         </div>
       </nav>
 

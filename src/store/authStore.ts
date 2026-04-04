@@ -5,7 +5,15 @@ export interface User {
   id: string;
   name: string;
   company_name: string;
+  company_domain?: string | null;
+  company_logo?: string | null;
   email: string;
+  position?: string | null;
+  phone_code?: string | null;
+  phone?: string | null;
+  bio?: string | null;
+  avatar_url?: string | null;
+  cover_url?: string | null;
 }
 
 interface AuthState {
