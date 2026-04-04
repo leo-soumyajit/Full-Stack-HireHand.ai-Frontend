@@ -278,12 +278,13 @@ export default function InterviewRoom() {
 
     peer.on("error", (err: any) => {
       console.error("Peer error:", err);
+
       if (err.type === "peer-unavailable") {
         // Host isn't there yet.
-        setConnectionStatus("waiting");
+        setConnectionStatus((prev) => prev === "connected" ? "connected" : "waiting");
         
         // ── Auto-retry calling the host if guest joined first ──
-        if (role === "guest" && connectionStatus !== "connected") {
+        if (role === "guest") {
           console.log("Host not alive yet... retrying in 3s");
           clearTimeout(reconnectTimerRef.current || 0);
           reconnectTimerRef.current = window.setTimeout(() => {
@@ -349,12 +350,18 @@ export default function InterviewRoom() {
     
     call.on("close", () => {
       console.log("Call closed by remote peer");
-      setConnectionStatus("disconnected");
+      // CRITICAL FIX: Only change state if THIS is the currently active call!
+      // This prevents old/dropped connections from unmounting the current active one
+      if (callRef.current === call) {
+        setConnectionStatus("disconnected");
+      }
     });
     
     call.on("error", (err) => {
       console.error("Call error:", err);
-      setConnectionStatus("failed");
+      if (callRef.current === call) {
+        setConnectionStatus("failed");
+      }
     });
   };
 
@@ -604,7 +611,7 @@ export default function InterviewRoom() {
           {/* Remote Video (Main) */}
           <div className="flex-1 relative rounded-2xl overflow-hidden bg-[#1a1a2e] border border-white/5">
             {connectionStatus === "connected" ? (
-              <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+              <video ref={remoteVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-4">
