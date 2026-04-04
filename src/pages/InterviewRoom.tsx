@@ -113,7 +113,7 @@ export default function InterviewRoom() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [showTranscript, setShowTranscript] = useState(role === "host");
+  const [showTranscript, setShowTranscript] = useState(true); // Both sides see transcript
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [interimText, setInterimText] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -233,17 +233,29 @@ export default function InterviewRoom() {
     // Force a unique guest ID so they don't overlap, but Host MUST be static
     const peerId = role === "host" ? `${roomId}-host` : `${roomId}-guest-${Math.floor(Math.random()*10000)}`;
 
+    // Fetch TURN credentials securely from our backend (API key stays server-side)
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    let iceServers: RTCIceServer[] = [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+    ];
+
+    try {
+      const res = await fetch(`${API_BASE}/api/turn-credentials`);
+      if (res.ok) {
+        const turnServers = await res.json();
+        if (Array.isArray(turnServers) && turnServers.length > 0) {
+          iceServers = turnServers;
+          console.log(`🔒 Got ${turnServers.length} ICE/TURN servers from backend`);
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ Could not fetch TURN credentials, using STUN-only fallback:", e);
+    }
+
     const peer = new Peer(peerId, {
-      config: {
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" },
-          { urls: "stun:stun2.l.google.com:19302" },
-          { urls: "stun:stun3.l.google.com:19302" },
-          { urls: "stun:stun4.l.google.com:19302" },
-        ],
-      },
-      debug: 2
+      config: { iceServers },
+      debug: 1
     });
 
     peerRef.current = peer;
@@ -375,10 +387,11 @@ export default function InterviewRoom() {
     if (!stream) return;
 
     // Check speech recognition support
+    // Start speech recognition for BOTH host and guest (both transcribe their own voice)
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setSpeechSupported(false);
-    } else if (role === "host") {
+    } else {
       speechRecognition.start();
     }
 
