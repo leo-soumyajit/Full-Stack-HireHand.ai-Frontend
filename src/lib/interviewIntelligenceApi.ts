@@ -47,4 +47,8 @@ export const interviewIntelligenceApi = {
   deleteAnalysis: async (analysisId: string): Promise<void> => {
     return apiFetch<void>(`/api/interview-intelligence/${analysisId}`, { method: "DELETE" });
   },
+
+  retryAnalysis: async (analysisId: string): Promise<{ id: string; status: string; message: string }> => {
+    return apiFetch<{ id: string; status: string; message: string }>(`/api/interview-intelligence/retry/${analysisId}`, { method: "POST" });
+  },
 };

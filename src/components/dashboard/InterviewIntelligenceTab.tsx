@@ -196,6 +196,21 @@ export function InterviewIntelligenceTab({ positionId, positionTitle }: Props) {
                 <XCircle className="h-10 w-10 text-red-400 mx-auto mb-4" />
                 <p className="text-lg font-semibold text-foreground">Analysis Failed</p>
                 <p className="text-sm text-red-400/80 mt-2">{detail.error || "Unknown error"}</p>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      await interviewIntelligenceApi.retryAnalysis(selectedId!);
+                      // Reload the detail to show processing state
+                      openDetail(selectedId!);
+                    } catch (e) {
+                      console.error("Retry failed:", e);
+                    }
+                  }}
+                  className="mt-4"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" /> Retry Analysis
+                </Button>
               </CardContent>
             </Card>
           ) : (
