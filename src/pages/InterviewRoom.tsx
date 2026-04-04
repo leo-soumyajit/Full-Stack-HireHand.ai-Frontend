@@ -137,8 +137,11 @@ export default function InterviewRoom() {
   const timerRef = useRef<number | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const remoteStreamRef = useRef<MediaStream | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const dataConnRef = useRef<any>(null);
+  const dataConnOpenRef = useRef(false);
+  const pendingTranscriptsRef = useRef<any[]>([]);
 
   // ── Speech Recognition ─────────────────────────────────────────────
   const handleData = useCallback((data: any) => {
@@ -159,8 +162,18 @@ export default function InterviewRoom() {
       setTranscript(prev => [...prev, entry].sort((a,b) => a.id - b.id));
       setInterimText("");
       
-      if (dataConnRef.current && dataConnRef.current.open) {
-         dataConnRef.current.send({ type: "transcript", entry });
+      // Send to remote peer via data channel
+      if (dataConnRef.current && dataConnOpenRef.current) {
+         try {
+           dataConnRef.current.send({ type: "transcript", entry });
+           console.log(`📤 Sent transcript to peer: "${entry.text}"`);
+         } catch (e) {
+           console.warn("Failed to send transcript:", e);
+         }
+      } else {
+        // Buffer it and send when connection opens
+        pendingTranscriptsRef.current.push(entry);
+        console.log(`📦 Buffered transcript (channel not open yet): "${entry.text}"`);
       }
     } else {
       setInterimText(text);
@@ -273,16 +286,36 @@ export default function InterviewRoom() {
         handleCall(call);
         
         // Setup data connection for transcripts
-        const dataConn = peer.connect(`${roomId}-host`);
+        const dataConn = peer.connect(`${roomId}-host`, { reliable: true });
         dataConnRef.current = dataConn;
+        dataConn.on("open", () => {
+          console.log("🔗 Guest: Data channel to host is OPEN");
+          dataConnOpenRef.current = true;
+          // Flush any buffered transcripts
+          pendingTranscriptsRef.current.forEach(entry => {
+            dataConn.send({ type: "transcript", entry });
+          });
+          pendingTranscriptsRef.current = [];
+        });
         dataConn.on("data", handleData);
+        dataConn.on("close", () => { dataConnOpenRef.current = false; });
       }
     });
 
     peer.on("connection", (conn) => {
-      console.log("🔗 Host: Data connection established!");
+      console.log("🔗 Host: Data connection from guest!");
       dataConnRef.current = conn;
+      conn.on("open", () => {
+        console.log("🔗 Host: Data channel is OPEN");
+        dataConnOpenRef.current = true;
+        // Flush any buffered transcripts
+        pendingTranscriptsRef.current.forEach(entry => {
+          conn.send({ type: "transcript", entry });
+        });
+        pendingTranscriptsRef.current = [];
+      });
       conn.on("data", handleData);
+      conn.on("close", () => { dataConnOpenRef.current = false; });
     });
 
     peer.on("call", (call) => {
@@ -393,13 +426,41 @@ export default function InterviewRoom() {
     await initPeer(stream);
   };
 
-  // ── Bind remote stream to video element AFTER React renders it ─────
+  // ── Bind remote stream to video + audio AFTER React renders ─────────
   useEffect(() => {
-    if (connectionStatus === "connected" && remoteStreamRef.current && remoteVideoRef.current) {
-      console.log("🎥 Binding remote stream to video element");
-      remoteVideoRef.current.srcObject = remoteStreamRef.current;
-      remoteVideoRef.current.play().catch(e => console.error("Play prevented:", e));
+    if (connectionStatus === "connected" && remoteStreamRef.current) {
+      // Bind video
+      if (remoteVideoRef.current) {
+        console.log("🎥 Binding remote stream to video element");
+        remoteVideoRef.current.srcObject = remoteStreamRef.current;
+        remoteVideoRef.current.volume = 1.0;
+        remoteVideoRef.current.play().catch(e => console.error("Video play prevented:", e));
+      }
+      
+      // CRITICAL: Create a separate audio element for reliable audio playback
+      // This bypasses browser autoplay restrictions on the video element
+      if (!remoteAudioRef.current) {
+        const audioEl = document.createElement('audio');
+        audioEl.autoplay = true;
+        audioEl.srcObject = remoteStreamRef.current;
+        audioEl.volume = 1.0;
+        document.body.appendChild(audioEl);
+        remoteAudioRef.current = audioEl;
+        audioEl.play().then(() => {
+          console.log("🔊 Remote audio playing!");
+        }).catch(e => console.error("Audio play prevented:", e));
+      }
     }
+    
+    return () => {
+      // Cleanup audio element on unmount
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.pause();
+        remoteAudioRef.current.srcObject = null;
+        remoteAudioRef.current.remove();
+        remoteAudioRef.current = null;
+      }
+    };
   }, [connectionStatus]);
 
   // ── Toggle Controls ────────────────────────────────────────────────
@@ -432,6 +493,13 @@ export default function InterviewRoom() {
     callRef.current?.close();
     peerRef.current?.destroy();
     if (timerRef.current) clearInterval(timerRef.current);
+    // Cleanup audio element
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.pause();
+      remoteAudioRef.current.srcObject = null;
+      remoteAudioRef.current.remove();
+      remoteAudioRef.current = null;
+    }
 
     // Save transcript & trigger AI analysis
     if (role === "host" && scheduleId && fullTranscript.length > 20) {
