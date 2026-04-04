@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import Peer, { MediaConnection } from "peerjs";
 import { interviewIntelligenceApi } from "@/lib/interviewIntelligenceApi";
+import { useDeepgram } from "@/hooks/useDeepgram";
 
 // ══════════════════════════════════════════════════════════════════════
 // TYPES
@@ -36,62 +37,7 @@ interface TranscriptEntry {
 
 type ConnectionStatus = "connecting" | "waiting" | "connected" | "disconnected" | "failed";
 
-// ══════════════════════════════════════════════════════════════════════
-// SPEECH RECOGNITION HOOK
-// ══════════════════════════════════════════════════════════════════════
-function useSpeechRecognition(onTranscript: (text: string, isFinal: boolean) => void) {
-  const recognitionRef = useRef<any>(null);
-  const isRunningRef = useRef(false);
 
-  const start = useCallback(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return false;
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-    recognition.maxAlternatives = 1;
-
-    recognition.onresult = (event: any) => {
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        onTranscript(result[0].transcript, result.isFinal);
-      }
-    };
-
-    recognition.onerror = (event: any) => {
-      console.warn("Speech recognition error:", event.error);
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-          isRunningRef.current = false;
-      }
-    };
-
-    recognition.onend = () => {
-      // Auto-restart if still supposed to be running
-      if (isRunningRef.current) {
-        setTimeout(() => {
-          try { recognition.start(); } catch { /* ignore */ }
-        }, 800);
-      }
-    };
-
-    recognitionRef.current = recognition;
-    isRunningRef.current = true;
-    try { recognition.start(); } catch { /* ignore */ }
-    return true;
-  }, [onTranscript]);
-
-  const stop = useCallback(() => {
-    isRunningRef.current = false;
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch { /* ignore */ }
-      recognitionRef.current = null;
-    }
-  }, []);
-
-  return { start, stop };
-}
 
 // ══════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -168,7 +114,7 @@ export default function InterviewRoom() {
     }
   }, [userName, roomId]);
 
-  const speechRecognition = useSpeechRecognition(handleTranscript);
+  const deepgram = useDeepgram(handleTranscript);
 
   // ── Poll for remote transcripts ────────────────────────────────────
   useEffect(() => {
@@ -415,15 +361,8 @@ export default function InterviewRoom() {
     const stream = await initMedia();
     if (!stream) return;
 
-    // Check speech recognition support
-    // Start speech recognition for BOTH host and guest (both transcribe their own voice)
-    // Guest's transcript gets sent to Host via data channel
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setSpeechSupported(false);
-    } else {
-      speechRecognition.start();
-    }
+    // Start Deepgram live transcription (Nova-2, Indian English)
+    deepgram.start(stream);
 
     await initPeer(stream);
   };
@@ -485,7 +424,7 @@ export default function InterviewRoom() {
   // ── End Interview ──────────────────────────────────────────────────
   const handleEndInterview = async () => {
     setIsEnding(true);
-    speechRecognition.stop();
+    deepgram.stop();
 
     // Build full transcript text with speaker diarization
     const fullTranscript = transcript.map(e => `[${e.timestamp}] ${e.speaker || "Unknown"}: ${e.text}`).join("\n");
@@ -531,7 +470,7 @@ export default function InterviewRoom() {
   // ── Cleanup on unmount ─────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      speechRecognition.stop();
+      deepgram.stop();
       localStreamRef.current?.getTracks().forEach(t => t.stop());
       callRef.current?.close();
       peerRef.current?.destroy();
