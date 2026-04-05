@@ -29,6 +29,7 @@ import { interviewIntelligenceApi } from "@/lib/interviewIntelligenceApi";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useDeepgram } from "@/hooks/useDeepgram";
 import { ScreenShareButton } from "@/components/interview/ScreenShareButton";
+import { playChatNotification } from "@/utils/chatNotification";
 
 // ══════════════════════════════════════════════════════════════════════
 // TYPES
@@ -479,6 +480,54 @@ export default function InterviewRoom() {
       sessionStorage.setItem(sessionKey, JSON.stringify(stateToSave));
     }
   }, [preJoin, userName, transcript, elapsedSeconds, askedSet, chatMessages, sessionKey]);
+
+  // ── Auto-establish data connection for chat when call connects ─────
+  // ROOT CAUSE FIX: When guest retries after peer-unavailable, only the
+  // media call was retried — the data connection (chat) was never retried.
+  // This useEffect detects that scenario and auto-creates the data channel.
+  useEffect(() => {
+    if (connectionStatus !== "connected") return;
+
+    // Give the initial data connection attempt 2s to settle
+    const timer = window.setTimeout(() => {
+      if (dataConnRef.current && dataConnRef.current.open) return; // Already good
+
+      const peer = peerRef.current;
+      if (!peer || peer.destroyed) return;
+
+      if (role === "guest") {
+        // Guest initiates data connection to host
+        console.log("💬 Chat: Data connection missing — re-establishing...");
+        const dataConn = peer.connect(`${roomId}-host`, { metadata: { name: userName } });
+        dataConnRef.current = dataConn;
+        dataConn.on("open", () => console.log("💬 Chat: Data connection re-established!"));
+        dataConn.on("data", (payload: any) => {
+          if (payload.type === "chat") {
+            setChatMessages((prev) => {
+              if (prev.some((m) => m.id === payload.message.id)) return prev;
+              return [...prev, { ...payload.message, isSelf: false }];
+            });
+          }
+        });
+      }
+      // Host side: no action needed — host's peer.on("connection") handler
+      // (set in initPeer) will fire automatically when guest connects.
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [connectionStatus, role, roomId, userName]);
+
+  // ── Chat notification sound on incoming messages ──────────────────
+  const prevChatLenRef = useRef(chatMessages.length);
+  useEffect(() => {
+    if (chatMessages.length > prevChatLenRef.current) {
+      const lastMsg = chatMessages[chatMessages.length - 1];
+      if (!lastMsg.isSelf) {
+        playChatNotification();
+      }
+    }
+    prevChatLenRef.current = chatMessages.length;
+  }, [chatMessages]);
 
   // ── Send Chat Message ──────────────────────────────────────────────
   const sendChatMessage = () => {
