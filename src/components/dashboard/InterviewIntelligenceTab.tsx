@@ -673,8 +673,16 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
     return { id: i, time: "", speaker: "Unknown", text: line.trim() };
   });
 
-  // Support backwards compatibility: older AI parsed_transcripts returned lists directly, newer return dicts with parsed_qa
-  const qaList = Array.isArray(parsedQA) ? parsedQA : (parsedQA?.parsed_qa || []);
+  // Support backwards compatibility: older AI parsed_transcripts returned lists directly or JSON strings, newer return dicts with parsed_qa
+  let parsedQaData = parsedQA;
+  if (typeof parsedQA === 'string') {
+    try {
+      parsedQaData = JSON.parse(parsedQA);
+    } catch (e) {
+      console.error("Failed to parse QA string", e);
+    }
+  }
+  const qaList = Array.isArray(parsedQaData) ? parsedQaData : (parsedQaData?.parsed_qa || []);
 
   return (
     <div className="space-y-4">
