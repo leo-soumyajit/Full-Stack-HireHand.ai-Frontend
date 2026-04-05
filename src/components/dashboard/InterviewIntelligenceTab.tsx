@@ -673,7 +673,8 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
     return { id: i, time: "", speaker: "Unknown", text: line.trim() };
   });
 
-  const qaList = parsedQA?.parsed_qa || [];
+  // Support backwards compatibility: older AI parsed_transcripts returned lists directly, newer return dicts with parsed_qa
+  const qaList = Array.isArray(parsedQA) ? parsedQA : (parsedQA?.parsed_qa || []);
 
   return (
     <div className="space-y-4">
