@@ -28,6 +28,7 @@ import Peer, { MediaConnection } from "peerjs";
 import { interviewIntelligenceApi } from "@/lib/interviewIntelligenceApi";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useDeepgram } from "@/hooks/useDeepgram";
+import { ScreenShareButton } from "@/components/interview/ScreenShareButton";
 
 // ══════════════════════════════════════════════════════════════════════
 // TYPES
@@ -1168,6 +1169,15 @@ export default function InterviewRoom() {
         >
           {role === "host" ? <MessageSquareText className="h-5 w-5" /> : <MessageSquare className="h-5 w-5" />}
         </button>
+
+        {/* Screen Share */}
+        <ScreenShareButton
+          peerCallRef={callRef}
+          localStreamRef={localStreamRef}
+          localVideoRef={localVideoRef}
+          remoteVideoRef={remoteVideoRef}
+          isConnected={connectionStatus === "connected"}
+        />
 
         {/* End Call */}
         <button
