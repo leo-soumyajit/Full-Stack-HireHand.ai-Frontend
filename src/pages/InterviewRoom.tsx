@@ -21,9 +21,12 @@ import {
   Sparkles,
   Check,
   RefreshCw,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 import Peer, { MediaConnection } from "peerjs";
 import { interviewIntelligenceApi } from "@/lib/interviewIntelligenceApi";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useDeepgram } from "@/hooks/useDeepgram";
 
 // ══════════════════════════════════════════════════════════════════════
@@ -56,7 +59,7 @@ export default function InterviewRoom() {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [showTranscript, setShowTranscript] = useState(role === "host"); // Only Host sees transcript
+  const [showRightPanel, setshowRightPanel] = useState(role === "host"); // Only Host sees transcript
   
   // Auto-rejoin on refresh: check sessionStorage for previous join state
   const sessionKey = `hh-room-${roomId}`;
@@ -75,10 +78,17 @@ export default function InterviewRoom() {
   const [linkCopied, setLinkCopied] = useState(false);
   // remoteStreamReady removed — no longer needed with always-mounted video element
 
+  // ── Interactivity & Right Panel (Host & Guest) ────────────────────────
+  type RightPanelTab = "transcript" | "questions" | "chat";
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>(role === "host" ? "transcript" : "chat");
+  
   // ── Interview Questions Guide (Host only) ──────────────────────────
-  type RightPanelTab = "transcript" | "questions";
-  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>("transcript");
   const [interviewQuestions, setInterviewQuestions] = useState<any[]>([]);
+  
+  // ── Chat State ───────────────────────────────────────────────────────
+  type ChatMessage = { id: string; sender: string; text: string; timestamp: string; isSelf: boolean; };
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(parsedSession?.chatMessages || []);
+  const [chatInput, setChatInput] = useState("");
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [askedSet, setAskedSet] = useState<Set<string>>(new Set(parsedSession?.askedSet || []));
   const [activeLevel, setActiveLevel] = useState<string>("all");
@@ -91,6 +101,7 @@ export default function InterviewRoom() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerRef = useRef<Peer | null>(null);
   const callRef = useRef<MediaConnection | null>(null);
+  const dataConnRef = useRef<any>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const entryIdRef = useRef(0);
   const timerRef = useRef<number | null>(null);
@@ -268,6 +279,24 @@ export default function InterviewRoom() {
 
     peerRef.current = peer;
 
+    // ── Data Connection Handler (Chat) ──
+    const setupDataConnection = (conn: any) => {
+      dataConnRef.current = conn;
+      conn.on("open", () => console.log("💬 Data connection opened with", conn.peer));
+      conn.on("data", (payload: any) => {
+        if (payload.type === "chat") {
+          setChatMessages((prev) => {
+            // Avoid duplicates just in case
+            if (prev.some((m) => m.id === payload.message.id)) return prev;
+            return [...prev, { ...payload.message, isSelf: false }];
+          });
+        }
+      });
+    };
+
+    // Host listens for incoming data connections
+    peer.on("connection", (conn) => setupDataConnection(conn));
+
     peer.on("open", () => {
       console.log(`✅ Peer connected to signaling server: ${peerId}`);
       if (role === "host") {
@@ -278,6 +307,10 @@ export default function InterviewRoom() {
         setConnectionStatus("connecting");
         const call = peer.call(`${roomId}-host`, stream, { metadata: { name: userName } });
         handleCall(call);
+        
+        // Guest: Also connect data channel for chat
+        const dataConn = peer.connect(`${roomId}-host`, { metadata: { name: userName } });
+        setupDataConnection(dataConn);
       }
     });
 
@@ -440,10 +473,30 @@ export default function InterviewRoom() {
         transcript,
         elapsedSeconds,
         askedSet: Array.from(askedSet),
+        chatMessages,
       };
       sessionStorage.setItem(sessionKey, JSON.stringify(stateToSave));
     }
-  }, [preJoin, userName, transcript, elapsedSeconds, askedSet, sessionKey]);
+  }, [preJoin, userName, transcript, elapsedSeconds, askedSet, chatMessages, sessionKey]);
+
+  // ── Send Chat Message ──────────────────────────────────────────────
+  const sendChatMessage = () => {
+    if (!chatInput.trim()) return;
+    const msg: ChatMessage = {
+      id: Math.random().toString(36).substring(2, 9),
+      sender: userName,
+      text: chatInput.trim(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isSelf: true
+    };
+    // Update local state
+    setChatMessages((prev) => [...prev, msg]);
+    // Send to peer
+    if (dataConnRef.current && dataConnRef.current.open) {
+      dataConnRef.current.send({ type: "chat", message: { ...msg, isSelf: false } });
+    }
+    setChatInput("");
+  };
 
   // ── Bind remote stream to video + audio ─────────────────────────────
   // Called ONCE per connection from handleCall's stream event.
@@ -687,10 +740,13 @@ export default function InterviewRoom() {
              connectionStatus === "failed" ? "Connection failed" : "Connecting..."}
           </div>
 
-          {/* Timer */}
-          <div className="flex items-center gap-1.5 text-white/60 text-xs font-mono">
-            <Clock className="h-3 w-3" />
-            {formatTime(elapsedSeconds)}
+          {/* Timer & Theme Toggle */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 text-white/60 text-xs font-mono">
+              <Clock className="h-3 w-3" />
+              {formatTime(elapsedSeconds)}
+            </div>
+            <ThemeToggle />
           </div>
 
           {/* Recording indicator */}
@@ -766,7 +822,7 @@ export default function InterviewRoom() {
 
         {/* ═══ Right Side Panel (Transcript + Questions Tabs) ═══ */}
         <AnimatePresence>
-          {showTranscript && (
+          {showRightPanel && (
             <motion.div
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: 400, opacity: 1 }}
@@ -804,11 +860,74 @@ export default function InterviewRoom() {
                       {interviewQuestions.length}
                     </span>
                   </button>
+                  <button
+                    onClick={() => setRightPanelTab("chat")}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs font-semibold transition-all ${
+                      rightPanelTab === "chat"
+                        ? "text-purple-400 border-b-2 border-purple-400 bg-purple-500/5"
+                        : "text-white/40 hover:text-white/60"
+                    }`}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Chat
+                  </button>
                 </div>
               )}
 
+              {/* ── Chat Content ──────────────────────────── */}
+              {rightPanelTab === "chat" && (
+                <>
+                  <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-purple-400" />
+                      <span className="text-sm font-semibold text-white">Live Chat</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {chatMessages.length === 0 ? (
+                      <div className="text-center py-12">
+                        <MessageSquare className="h-8 w-8 text-white/10 mx-auto mb-3" />
+                        <p className="text-white/30 text-xs">Send a message to start chatting...</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {chatMessages.map(msg => (
+                          <div key={msg.id} className={`flex flex-col ${msg.isSelf ? 'items-end' : 'items-start'}`}>
+                            <span className="text-[10px] text-white/40 mb-1">{msg.sender} • {msg.timestamp}</span>
+                            <div className={`max-w-[80%] px-3 py-2 rounded-xl text-sm ${msg.isSelf ? 'bg-purple-600 text-white rounded-tr-sm' : 'bg-white/10 text-white/90 rounded-tl-sm'}`}>
+                              {msg.text}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-3 border-t border-white/5 bg-white/[0.02]">
+                    <div className="relative flex items-center">
+                      <input 
+                        type="text" 
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") sendChatMessage(); }}
+                        placeholder="Type a message..."
+                        className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-full pl-4 pr-10 py-2.5 outline-none focus:border-purple-500/50 transition-colors"
+                      />
+                      <button 
+                        onClick={sendChatMessage}
+                        disabled={!chatInput.trim()}
+                        className="absolute right-1 w-8 h-8 flex items-center justify-center rounded-full bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-50 disabled:hover:bg-purple-600 transition-colors"
+                      >
+                        <Send className="h-4 w-4 ml-[-2px]" />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* ── Transcript Content ──────────────────────────── */}
-              {(rightPanelTab === "transcript" || interviewQuestions.length === 0) && rightPanelTab !== "questions" && (
+              {rightPanelTab === "transcript" && (
                 <>
                   <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1039,17 +1158,16 @@ export default function InterviewRoom() {
           {isCameraOn ? <VideoIcon className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
         </button>
 
-        {/* Transcript Toggle */}
-        {role === "host" && (
-          <button
-            onClick={() => setShowTranscript(!showTranscript)}
-            className={`p-3.5 rounded-full transition-all ${
-              showTranscript ? "bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30" : "bg-white/10 hover:bg-white/15 text-white"
-            }`}
-          >
-            <MessageSquareText className="h-5 w-5" />
-          </button>
-        )}
+        {/* Panel Toggle (Transcript/Chat) */}
+        <button
+          onClick={() => setshowRightPanel(!showRightPanel)}
+          className={`p-3.5 rounded-full transition-all ${
+            showRightPanel ? "bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30" : "bg-white/10 hover:bg-white/15 text-white"
+          }`}
+          title={role === "host" ? "Toggle Options" : "Chat"}
+        >
+          {role === "host" ? <MessageSquareText className="h-5 w-5" /> : <MessageSquare className="h-5 w-5" />}
+        </button>
 
         {/* End Call */}
         <button
