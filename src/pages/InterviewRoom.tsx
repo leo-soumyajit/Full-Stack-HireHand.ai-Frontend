@@ -894,8 +894,8 @@ export default function InterviewRoom() {
               className="h-full border-l border-white/5 bg-[#12121a] flex flex-col overflow-hidden"
             >
               {/* ── Tab Switcher ─────────────────────────────────── */}
-              {role === "host" && interviewQuestions.length > 0 && (
-                <div className="flex border-b border-white/5">
+              <div className="flex border-b border-white/5">
+                {role === "host" && (
                   <button
                     onClick={() => setRightPanelTab("transcript")}
                     className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs font-semibold transition-all ${
@@ -907,6 +907,8 @@ export default function InterviewRoom() {
                     <MessageSquareText className="h-3.5 w-3.5" />
                     Transcript
                   </button>
+                )}
+                {role === "host" && (
                   <button
                     onClick={() => setRightPanelTab("questions")}
                     className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs font-semibold transition-all relative ${
@@ -923,7 +925,8 @@ export default function InterviewRoom() {
                       {interviewQuestions.length}
                     </span>
                   </button>
-                  <button
+                )}
+                <button
                     onClick={() => setRightPanelTab("chat")}
                     className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs font-semibold transition-all ${
                       rightPanelTab === "chat"
@@ -932,10 +935,9 @@ export default function InterviewRoom() {
                     }`}
                   >
                     <MessageSquare className="h-3.5 w-3.5" />
-                    Chat
-                  </button>
-                </div>
-              )}
+                  Chat
+                </button>
+              </div>
 
               {/* ── Chat Content ──────────────────────────── */}
               {rightPanelTab === "chat" && (
@@ -1033,9 +1035,34 @@ export default function InterviewRoom() {
               )}
 
               {/* ── Questions Guide Content ─────────────────────── */}
-              {rightPanelTab === "questions" && interviewQuestions.length > 0 && (
+              {rightPanelTab === "questions" && (
                 <>
-                  {/* Header with progress */}
+                  {interviewQuestions.length === 0 && !questionsLoading ? (
+                    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                      <ListChecks className="h-10 w-10 text-white/10 mx-auto mb-4" />
+                      <p className="text-white/60 text-sm font-semibold mb-1">No Questions Found</p>
+                      <p className="text-white/30 text-xs">This interview has no predefined questions.</p>
+                      <button
+                        onClick={() => {
+                          const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+                          setQuestionsLoading(true);
+                          fetch(`${API_BASE}/api/schedules/${scheduleId}/questions`)
+                            .then(r => r.json())
+                            .then(data => {
+                              setInterviewQuestions(data.questions || []);
+                              setPositionTitle(data.position_title || "");
+                            })
+                            .catch(err => console.error("Refresh questions failed:", err))
+                            .finally(() => setQuestionsLoading(false));
+                        }}
+                        className="mt-6 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 text-xs hover:bg-white/10 transition-colors flex items-center gap-2 mx-auto"
+                      >
+                       <RefreshCw className="h-3 w-3" /> Retry Loading
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Header with progress */}
                   <div className="px-4 py-3 border-b border-white/5">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
@@ -1194,6 +1221,8 @@ export default function InterviewRoom() {
                   </div>
                 </>
               )}
+            </>
+          )}
             </motion.div>
           )}
         </AnimatePresence>
