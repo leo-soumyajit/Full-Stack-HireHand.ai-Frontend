@@ -689,7 +689,6 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
         >
           💬 Chat View
         </button>
-        {qaList.length > 0 && (
           <button
             onClick={() => setViewMode("qa")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -700,7 +699,6 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
           >
             📋 Q&A Pairs
           </button>
-        )}
         <span className="text-xs text-muted-foreground ml-auto">
           {viewMode === "chat" ? `${chatMessages.length} messages` : `${qaList.length} questions`}
         </span>
@@ -750,24 +748,33 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
       ) : (
         /* ── Q&A Pairs View ───────────────────────────────────────── */
         <div className="space-y-4">
-          {qaList.map((qa: any, i: number) => (
-            <Card key={i} className="glass-card">
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-[10px]">Q{qa.question_number || i + 1}</Badge>
-                  <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">{qa.topic_category || "General"}</Badge>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1 font-semibold">INTERVIEWER</p>
-                  <p className="text-sm text-foreground">{qa.interviewer_question}</p>
-                </div>
-                <div className="border-l-2 border-primary/30 pl-3">
-                  <p className="text-xs text-muted-foreground mb-1 font-semibold">CANDIDATE</p>
-                  <p className="text-sm text-foreground/90">{qa.candidate_answer}</p>
-                </div>
+          {qaList.length === 0 ? (
+            <Card className="glass-card">
+              <CardContent className="p-8 text-center flex flex-col items-center justify-center">
+                <p className="text-muted-foreground text-sm font-semibold mb-1">No Q&A Pairs Detected</p>
+                <p className="text-muted-foreground/60 text-xs">The AI couldn't extract structured question and answer pairs from this transcript (e.g. if the interview was too short or unstructured).</p>
               </CardContent>
             </Card>
-          ))}
+          ) : (
+            qaList.map((qa: any, i: number) => (
+              <Card key={i} className="glass-card">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px]">Q{qa.question_number || i + 1}</Badge>
+                    <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">{qa.topic_category || "General"}</Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1 font-semibold">INTERVIEWER</p>
+                    <p className="text-sm text-foreground">{qa.interviewer_question}</p>
+                  </div>
+                  <div className="border-l-2 border-primary/30 pl-3">
+                    <p className="text-xs text-muted-foreground mb-1 font-semibold">CANDIDATE</p>
+                    <p className="text-sm text-foreground/90">{qa.candidate_answer}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       )}
 
