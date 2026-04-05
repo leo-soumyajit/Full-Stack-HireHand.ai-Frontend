@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Sparkles,
   Check,
+  RefreshCw,
 } from "lucide-react";
 import Peer, { MediaConnection } from "peerjs";
 import { interviewIntelligenceApi } from "@/lib/interviewIntelligenceApi";
@@ -61,8 +62,12 @@ export default function InterviewRoom() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isEnding, setIsEnding] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
-  const [preJoin, setPreJoin] = useState(true);
-  const [userName, setUserName] = useState(role === "host" ? "Interviewer" : "Candidate");
+  // Auto-rejoin on refresh: check sessionStorage for previous join state
+  const sessionKey = `hh-room-${roomId}`;
+  const savedSession = typeof window !== "undefined" ? sessionStorage.getItem(sessionKey) : null;
+  const parsedSession = savedSession ? JSON.parse(savedSession) : null;
+  const [preJoin, setPreJoin] = useState(!parsedSession);
+  const [userName, setUserName] = useState(parsedSession?.userName || (role === "host" ? "Interviewer" : "Candidate"));
   const [remoteName, setRemoteName] = useState("");
 
   const [linkCopied, setLinkCopied] = useState(false);
@@ -379,6 +384,8 @@ export default function InterviewRoom() {
   // ── Join Room ──────────────────────────────────────────────────────
   const handleJoinRoom = async () => {
     setPreJoin(false);
+    // Save join state to sessionStorage for auto-rejoin on refresh
+    sessionStorage.setItem(sessionKey, JSON.stringify({ userName, joinedAt: Date.now() }));
     const stream = await initMedia();
     if (!stream) return;
 
@@ -387,6 +394,14 @@ export default function InterviewRoom() {
 
     await initPeer(stream);
   };
+
+  // ── Auto-rejoin on page refresh ────────────────────────────────────
+  useEffect(() => {
+    if (parsedSession && preJoin === false) {
+      // User previously joined this room — auto-reconnect
+      handleJoinRoom();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Bind remote stream to video + audio ─────────────────────────────
   // Called ONCE per connection from handleCall's stream event.
@@ -455,6 +470,8 @@ export default function InterviewRoom() {
   // ── End Interview ──────────────────────────────────────────────────
   const handleEndInterview = async () => {
     setIsEnding(true);
+    // Clear auto-rejoin so next visit shows pre-join screen
+    sessionStorage.removeItem(sessionKey);
     deepgram.stop();
 
     // Build full transcript text with speaker diarization
@@ -811,6 +828,24 @@ export default function InterviewRoom() {
                         <span className="text-[10px] text-white/20">/</span>
                         <span className="text-[10px] font-mono text-white/40">{interviewQuestions.length}</span>
                         <span className="text-[10px] text-white/20 ml-0.5">asked</span>
+                        <button
+                          onClick={() => {
+                            const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+                            setQuestionsLoading(true);
+                            fetch(`${API_BASE}/api/schedules/${scheduleId}/questions`)
+                              .then(r => r.json())
+                              .then(data => {
+                                setInterviewQuestions(data.questions || []);
+                                setPositionTitle(data.position_title || "");
+                              })
+                              .catch(err => console.error("Refresh questions failed:", err))
+                              .finally(() => setQuestionsLoading(false));
+                          }}
+                          className="ml-1 p-1 rounded-md hover:bg-white/10 text-white/30 hover:text-white/60 transition-all"
+                          title="Refresh questions"
+                        >
+                          <RefreshCw className={`h-3 w-3 ${questionsLoading ? "animate-spin" : ""}`} />
+                        </button>
                       </div>
                     </div>
                     {/* Progress bar */}
