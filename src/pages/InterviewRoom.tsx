@@ -619,8 +619,13 @@ export default function InterviewRoom() {
     sessionStorage.removeItem(sessionKey);
     deepgram.stop();
 
-    // Build full transcript text with speaker diarization
-    const fullTranscript = transcript.map(e => `[${e.timestamp}] ${e.speaker || "Unknown"}: ${e.text}`).join("\n");
+    // Build full transcript text with clear role labels for AI analysis
+    const fullTranscript = transcript.map(e => {
+      const roleLabel = e.speaker === userName
+        ? (role === "host" ? "Interviewer" : "Candidate")
+        : (role === "host" ? "Candidate" : "Interviewer");
+      return `[${e.timestamp}] ${roleLabel}: ${e.text}`;
+    }).join("\n");
 
     // Cleanup media
     localStreamRef.current?.getTracks().forEach(t => t.stop());
