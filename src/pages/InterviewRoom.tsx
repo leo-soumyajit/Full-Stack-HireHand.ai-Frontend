@@ -57,17 +57,19 @@ export default function InterviewRoom() {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [showTranscript, setShowTranscript] = useState(role === "host"); // Only Host sees transcript
-  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
-  const [interimText, setInterimText] = useState("");
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [isEnding, setIsEnding] = useState(false);
-  const [showEndConfirm, setShowEndConfirm] = useState(false);
+  
   // Auto-rejoin on refresh: check sessionStorage for previous join state
   const sessionKey = `hh-room-${roomId}`;
   const savedSession = typeof window !== "undefined" ? sessionStorage.getItem(sessionKey) : null;
   const parsedSession = savedSession ? JSON.parse(savedSession) : null;
   const [preJoin, setPreJoin] = useState(!parsedSession);
   const [userName, setUserName] = useState(parsedSession?.userName || (role === "host" ? "Interviewer" : "Candidate"));
+  
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>(parsedSession?.transcript || []);
+  const [interimText, setInterimText] = useState("");
+  const [elapsedSeconds, setElapsedSeconds] = useState(parsedSession?.elapsedSeconds || 0);
+  const [isEnding, setIsEnding] = useState(false);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [remoteName, setRemoteName] = useState("");
 
   const [linkCopied, setLinkCopied] = useState(false);
@@ -78,7 +80,7 @@ export default function InterviewRoom() {
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>("transcript");
   const [interviewQuestions, setInterviewQuestions] = useState<any[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
-  const [askedSet, setAskedSet] = useState<Set<string>>(new Set());
+  const [askedSet, setAskedSet] = useState<Set<string>>(new Set(parsedSession?.askedSet || []));
   const [activeLevel, setActiveLevel] = useState<string>("all");
   const [positionTitle, setPositionTitle] = useState("");
 
@@ -369,14 +371,40 @@ export default function InterviewRoom() {
     call.on("close", () => {
       console.log("Call closed by remote peer");
       if (callRef.current === call) {
-        setConnectionStatus("disconnected");
+        if (role === "host") {
+          setConnectionStatus("waiting");
+        } else {
+          setConnectionStatus("disconnected");
+          // Guest auto-reconnects to host on call drop
+          console.log("Guest: Call dropped. Retrying host call in 3s...");
+          clearTimeout(reconnectTimerRef.current || 0);
+          reconnectTimerRef.current = window.setTimeout(() => {
+            if (peerRef.current && !peerRef.current.destroyed && localStreamRef.current) {
+              const newCall = peerRef.current.call(`${roomId}-host`, localStreamRef.current, { metadata: { name: userName } });
+              handleCall(newCall);
+            }
+          }, 3000);
+        }
       }
     });
     
     call.on("error", (err) => {
       console.error("Call error:", err);
       if (callRef.current === call) {
-        setConnectionStatus("failed");
+        if (role === "host") {
+          setConnectionStatus("waiting");
+        } else {
+          setConnectionStatus("failed");
+          // Guest auto-reconnects to host on call error
+          console.log("Guest: Call error. Retrying host call in 3s...");
+          clearTimeout(reconnectTimerRef.current || 0);
+          reconnectTimerRef.current = window.setTimeout(() => {
+            if (peerRef.current && !peerRef.current.destroyed && localStreamRef.current) {
+              const newCall = peerRef.current.call(`${roomId}-host`, localStreamRef.current, { metadata: { name: userName } });
+              handleCall(newCall);
+            }
+          }, 3000);
+        }
       }
     });
   };
@@ -402,6 +430,20 @@ export default function InterviewRoom() {
       handleJoinRoom();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Persist Session State (so transcript & asked questions survive refresh) ──
+  useEffect(() => {
+    if (!preJoin) {
+      const stateToSave = {
+        userName,
+        joinedAt: parsedSession?.joinedAt || Date.now(),
+        transcript,
+        elapsedSeconds,
+        askedSet: Array.from(askedSet),
+      };
+      sessionStorage.setItem(sessionKey, JSON.stringify(stateToSave));
+    }
+  }, [preJoin, userName, transcript, elapsedSeconds, askedSet, sessionKey]);
 
   // ── Bind remote stream to video + audio ─────────────────────────────
   // Called ONCE per connection from handleCall's stream event.
