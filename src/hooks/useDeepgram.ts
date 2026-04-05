@@ -9,6 +9,7 @@ import { useRef, useCallback } from "react";
  * 3. CLONE the audio track (so PeerJS WebRTC is NOT affected).
  * 4. Feed cloned audio via MediaRecorder every 250ms.
  * 5. Deepgram returns transcript results in real-time.
+ * 6. AUTO-RECONNECT on unexpected close (code 1011, network drops, etc.)
  */
 
 // Find a supported audio MIME type for MediaRecorder
@@ -36,11 +37,47 @@ export function useDeepgram(
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const clonedTrackRef = useRef<MediaStreamTrack | null>(null);
   const isRunningRef = useRef(false);
+  const streamRef = useRef<MediaStream | null>(null);
+  // ── Auto-reconnect state ──
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const userStoppedRef = useRef(false); // true = user called stop(), don't reconnect
+  const MAX_RECONNECT_ATTEMPTS = 5;
 
-  const start = useCallback(
+  // ── Cleanup internals without triggering reconnect ──
+  const cleanupInternals = useCallback(() => {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {
+        /* ignore */
+      }
+      mediaRecorderRef.current = null;
+    }
+    if (clonedTrackRef.current) {
+      clonedTrackRef.current.stop();
+      clonedTrackRef.current = null;
+    }
+    if (
+      socketRef.current &&
+      socketRef.current.readyState === WebSocket.OPEN
+    ) {
+      try {
+        socketRef.current.send(JSON.stringify({ type: "CloseStream" }));
+        socketRef.current.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    socketRef.current = null;
+  }, []);
+
+  // ── Core connection logic (used for initial + reconnect) ──
+  const connectToDeepgram = useCallback(
     async (stream: MediaStream) => {
-      if (isRunningRef.current) return;
-
       const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
       try {
@@ -68,6 +105,7 @@ export function useDeepgram(
         socket.onopen = () => {
           console.log("🟢 Deepgram WebSocket OPEN — starting audio capture");
           isRunningRef.current = true;
+          reconnectAttemptsRef.current = 0; // Reset on successful connect
 
           try {
             const mimeType = getSupportedMimeType();
@@ -140,50 +178,116 @@ export function useDeepgram(
             `🔴 Deepgram WebSocket closed (code: ${event.code})`
           );
           isRunningRef.current = false;
+
+          // ══════════════════════════════════════════════════════════════
+          // AUTO-RECONNECT: If the close was NOT user-initiated and
+          // we haven't exhausted retry attempts, reconnect automatically.
+          // Close code 1000 = normal closure (user-initiated via stop())
+          // Close code 1011 = server error (Deepgram internal issue)
+          // Any other code = unexpected disconnect
+          // ══════════════════════════════════════════════════════════════
+          if (
+            !userStoppedRef.current &&
+            event.code !== 1000 &&
+            reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS
+          ) {
+            reconnectAttemptsRef.current += 1;
+            const delay = Math.min(
+              2000 * Math.pow(1.5, reconnectAttemptsRef.current - 1),
+              15000
+            ); // exponential backoff: 2s, 3s, 4.5s, 6.75s, 10s
+
+            console.log(
+              `🔄 Deepgram auto-reconnect attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS} in ${Math.round(delay / 1000)}s...`
+            );
+
+            // Clean up old MediaRecorder & cloned track before reconnecting
+            if (
+              mediaRecorderRef.current &&
+              mediaRecorderRef.current.state !== "inactive"
+            ) {
+              try {
+                mediaRecorderRef.current.stop();
+              } catch {
+                /* ignore */
+              }
+              mediaRecorderRef.current = null;
+            }
+            if (clonedTrackRef.current) {
+              clonedTrackRef.current.stop();
+              clonedTrackRef.current = null;
+            }
+
+            reconnectTimerRef.current = setTimeout(() => {
+              if (!userStoppedRef.current && streamRef.current) {
+                // Verify the original audio track is still alive
+                const audioTrack = streamRef.current.getAudioTracks()[0];
+                if (audioTrack && audioTrack.readyState === "live") {
+                  console.log("🔄 Reconnecting to Deepgram...");
+                  connectToDeepgram(streamRef.current);
+                } else {
+                  console.warn(
+                    "⚠️ Original audio track is dead — cannot reconnect Deepgram"
+                  );
+                }
+              }
+            }, delay);
+          } else if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+            console.warn(
+              `⚠️ Deepgram reconnect exhausted (${MAX_RECONNECT_ATTEMPTS} attempts). Transcription stopped.`
+            );
+          }
         };
       } catch (err) {
         console.error("Deepgram initialization failed:", err);
+
+        // Also retry on init failure (e.g. token fetch failed due to network)
+        if (
+          !userStoppedRef.current &&
+          reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS
+        ) {
+          reconnectAttemptsRef.current += 1;
+          const delay = 3000 * reconnectAttemptsRef.current;
+          console.log(
+            `🔄 Deepgram init retry ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS} in ${delay / 1000}s...`
+          );
+          reconnectTimerRef.current = setTimeout(() => {
+            if (!userStoppedRef.current && streamRef.current) {
+              connectToDeepgram(streamRef.current);
+            }
+          }, delay);
+        }
       }
     },
-    [onTranscript]
+    [onTranscript, cleanupInternals]
   );
 
+  // ── Public: start transcription ──
+  const start = useCallback(
+    async (stream: MediaStream) => {
+      if (isRunningRef.current) return;
+      userStoppedRef.current = false;
+      reconnectAttemptsRef.current = 0;
+      streamRef.current = stream;
+      await connectToDeepgram(stream);
+    },
+    [connectToDeepgram]
+  );
+
+  // ── Public: stop transcription ──
   const stop = useCallback(() => {
+    userStoppedRef.current = true; // Prevent auto-reconnect
     isRunningRef.current = false;
 
-    // Stop MediaRecorder
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state !== "inactive"
-    ) {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch {
-        /* ignore */
-      }
-      mediaRecorderRef.current = null;
+    // Cancel any pending reconnect
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
     }
 
-    // Stop cloned audio track (important: don't leak resources)
-    if (clonedTrackRef.current) {
-      clonedTrackRef.current.stop();
-      clonedTrackRef.current = null;
-    }
-
-    // Close WebSocket gracefully
-    if (
-      socketRef.current &&
-      socketRef.current.readyState === WebSocket.OPEN
-    ) {
-      try {
-        socketRef.current.send(JSON.stringify({ type: "CloseStream" }));
-        socketRef.current.close();
-      } catch {
-        /* ignore */
-      }
-      socketRef.current = null;
-    }
-  }, []);
+    cleanupInternals();
+    streamRef.current = null;
+  }, [cleanupInternals]);
 
   return { start, stop };
 }
@@ -214,7 +318,7 @@ function startRawAudioFallback(stream: MediaStream, socket: WebSocket) {
       const int16 = new Int16Array(inputData.length);
       for (let i = 0; i < inputData.length; i++) {
         const s = Math.max(-1, Math.min(1, inputData[i]));
-        int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
       }
       socket.send(int16.buffer);
     };
