@@ -16,6 +16,10 @@ import {
   Copy,
   Users,
   Volume2,
+  ListChecks,
+  ChevronRight,
+  Sparkles,
+  Check,
 } from "lucide-react";
 import Peer, { MediaConnection } from "peerjs";
 import { interviewIntelligenceApi } from "@/lib/interviewIntelligenceApi";
@@ -63,6 +67,15 @@ export default function InterviewRoom() {
 
   const [linkCopied, setLinkCopied] = useState(false);
   // remoteStreamReady removed — no longer needed with always-mounted video element
+
+  // ── Interview Questions Guide (Host only) ──────────────────────────
+  type RightPanelTab = "transcript" | "questions";
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>("transcript");
+  const [interviewQuestions, setInterviewQuestions] = useState<any[]>([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [askedSet, setAskedSet] = useState<Set<string>>(new Set());
+  const [activeLevel, setActiveLevel] = useState<string>("all");
+  const [positionTitle, setPositionTitle] = useState("");
 
   // ── Refs ───────────────────────────────────────────────────────────
   const previewVideoRef = useRef<HTMLVideoElement>(null);
@@ -485,6 +498,36 @@ export default function InterviewRoom() {
     });
   };
 
+  // ── Fetch Interview Questions for Host ──────────────────────────────
+  useEffect(() => {
+    if (role !== "host" || !scheduleId) return;
+    const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+    setQuestionsLoading(true);
+    fetch(`${API_BASE}/api/schedules/${scheduleId}/questions`)
+      .then(r => r.json())
+      .then(data => {
+        setInterviewQuestions(data.questions || []);
+        setPositionTitle(data.position_title || "");
+      })
+      .catch(err => console.error("Failed to fetch questions:", err))
+      .finally(() => setQuestionsLoading(false));
+  }, [role, scheduleId]);
+
+  const toggleAsked = (qId: string) => {
+    setAskedSet(prev => {
+      const next = new Set(prev);
+      if (next.has(qId)) next.delete(qId);
+      else next.add(qId);
+      return next;
+    });
+  };
+
+  // Compute unique levels from questions
+  const availableLevels = Array.from(new Set(interviewQuestions.map(q => q.level || "L1"))).sort();
+  const filteredQuestions = activeLevel === "all"
+    ? interviewQuestions
+    : interviewQuestions.filter(q => (q.level || "L1") === activeLevel);
+
   // ── Cleanup on unmount ─────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -662,54 +705,236 @@ export default function InterviewRoom() {
           </div>
         </div>
 
-        {/* Transcript Panel */}
+        {/* ═══ Right Side Panel (Transcript + Questions Tabs) ═══ */}
         <AnimatePresence>
           {showTranscript && (
             <motion.div
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 380, opacity: 1 }}
+              animate={{ width: 400, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
               className="h-full border-l border-white/5 bg-[#12121a] flex flex-col overflow-hidden"
             >
-              <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageSquareText className="h-4 w-4 text-indigo-400" />
-                  <span className="text-sm font-semibold text-white">Live Transcript</span>
+              {/* ── Tab Switcher ─────────────────────────────────── */}
+              {role === "host" && interviewQuestions.length > 0 && (
+                <div className="flex border-b border-white/5">
+                  <button
+                    onClick={() => setRightPanelTab("transcript")}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs font-semibold transition-all ${
+                      rightPanelTab === "transcript"
+                        ? "text-indigo-400 border-b-2 border-indigo-400 bg-indigo-500/5"
+                        : "text-white/40 hover:text-white/60"
+                    }`}
+                  >
+                    <MessageSquareText className="h-3.5 w-3.5" />
+                    Transcript
+                  </button>
+                  <button
+                    onClick={() => setRightPanelTab("questions")}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs font-semibold transition-all relative ${
+                      rightPanelTab === "questions"
+                        ? "text-amber-400 border-b-2 border-amber-400 bg-amber-500/5"
+                        : "text-white/40 hover:text-white/60"
+                    }`}
+                  >
+                    <ListChecks className="h-3.5 w-3.5" />
+                    Questions
+                    <span className={`ml-1 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[9px] font-bold ${
+                      rightPanelTab === "questions" ? "bg-amber-400/20 text-amber-400" : "bg-white/10 text-white/40"
+                    }`}>
+                      {interviewQuestions.length}
+                    </span>
+                  </button>
                 </div>
-                <span className="text-[10px] text-white/30 font-mono">{transcript.length} entries</span>
-              </div>
+              )}
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {transcript.length === 0 && !interimText && (
-                  <div className="text-center py-12">
-                    <Volume2 className="h-8 w-8 text-white/10 mx-auto mb-3" />
-                    <p className="text-white/30 text-xs">Start speaking to see the transcript...</p>
+              {/* ── Transcript Content ──────────────────────────── */}
+              {(rightPanelTab === "transcript" || interviewQuestions.length === 0) && rightPanelTab !== "questions" && (
+                <>
+                  <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MessageSquareText className="h-4 w-4 text-indigo-400" />
+                      <span className="text-sm font-semibold text-white">Live Transcript</span>
+                    </div>
+                    <span className="text-[10px] text-white/30 font-mono">{transcript.length} entries</span>
                   </div>
-                )}
 
-                {transcript.map((entry) => (
-                  <div key={entry.id} className="group">
-                    <div className="flex items-start gap-3">
-                      <span className="text-[10px] text-white/20 font-mono mt-1 shrink-0">{entry.timestamp}</span>
-                      <div>
-                        <span className="text-[11px] font-semibold text-indigo-400 block mb-0.5">{entry.speaker || "Unknown"}</span>
-                        <p className="text-sm text-white/80 leading-relaxed">{entry.text}</p>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {transcript.length === 0 && !interimText && (
+                      <div className="text-center py-12">
+                        <Volume2 className="h-8 w-8 text-white/10 mx-auto mb-3" />
+                        <p className="text-white/30 text-xs">Start speaking to see the transcript...</p>
+                      </div>
+                    )}
+
+                    {transcript.map((entry) => (
+                      <div key={entry.id} className="group">
+                        <div className="flex items-start gap-3">
+                          <span className="text-[10px] text-white/20 font-mono mt-1 shrink-0">{entry.timestamp}</span>
+                          <div>
+                            <span className="text-[11px] font-semibold text-indigo-400 block mb-0.5">{entry.speaker || "Unknown"}</span>
+                            <p className="text-sm text-white/80 leading-relaxed">{entry.text}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {interimText && (
+                      <div className="flex items-start gap-2 opacity-50">
+                        <span className="text-[10px] text-indigo-400 font-mono mt-1 shrink-0">...</span>
+                        <p className="text-sm text-white/50 leading-relaxed italic">{interimText}</p>
+                      </div>
+                    )}
+
+                    <div ref={transcriptEndRef} />
+                  </div>
+                </>
+              )}
+
+              {/* ── Questions Guide Content ─────────────────────── */}
+              {rightPanelTab === "questions" && interviewQuestions.length > 0 && (
+                <>
+                  {/* Header with progress */}
+                  <div className="px-4 py-3 border-b border-white/5">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                          <Sparkles className="h-3 w-3 text-white" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-white block leading-tight">Question Guide</span>
+                          {positionTitle && <span className="text-[10px] text-white/30">{positionTitle}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-emerald-400">{askedSet.size}</span>
+                        <span className="text-[10px] text-white/20">/</span>
+                        <span className="text-[10px] font-mono text-white/40">{interviewQuestions.length}</span>
+                        <span className="text-[10px] text-white/20 ml-0.5">asked</span>
                       </div>
                     </div>
+                    {/* Progress bar */}
+                    <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-amber-500 to-emerald-500 transition-all duration-500"
+                        style={{ width: `${interviewQuestions.length > 0 ? (askedSet.size / interviewQuestions.length) * 100 : 0}%` }}
+                      />
+                    </div>
                   </div>
-                ))}
 
-                {/* Interim (typing) indicator */}
-                {interimText && (
-                  <div className="flex items-start gap-2 opacity-50">
-                    <span className="text-[10px] text-indigo-400 font-mono mt-1 shrink-0">...</span>
-                    <p className="text-sm text-white/50 leading-relaxed italic">{interimText}</p>
+                  {/* Level Tabs */}
+                  {availableLevels.length > 1 && (
+                    <div className="px-3 py-2 border-b border-white/5 flex gap-1 overflow-x-auto">
+                      <button
+                        onClick={() => setActiveLevel("all")}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all shrink-0 ${
+                          activeLevel === "all"
+                            ? "bg-white/10 text-white border border-white/20"
+                            : "text-white/30 hover:text-white/50"
+                        }`}
+                      >
+                        All ({interviewQuestions.length})
+                      </button>
+                      {availableLevels.map(lvl => {
+                        const count = interviewQuestions.filter(q => (q.level || "L1") === lvl).length;
+                        const askedCount = interviewQuestions.filter(q => (q.level || "L1") === lvl && askedSet.has(q.id)).length;
+                        return (
+                          <button
+                            key={lvl}
+                            onClick={() => setActiveLevel(lvl)}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all shrink-0 relative ${
+                              activeLevel === lvl
+                                ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                                : "text-white/30 hover:text-white/50"
+                            }`}
+                          >
+                            {lvl}
+                            <span className={`ml-1 ${askedCount === count && count > 0 ? "text-emerald-400" : ""}`}>
+                              ({askedCount}/{count})
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Questions List */}
+                  <div
+                    className="flex-1 overflow-y-auto p-3 space-y-2"
+                    onWheel={(e) => { e.stopPropagation(); e.currentTarget.scrollTop += e.deltaY; }}
+                  >
+                    {questionsLoading ? (
+                      <div className="text-center py-12">
+                        <Loader2 className="h-6 w-6 text-amber-400 animate-spin mx-auto mb-3" />
+                        <p className="text-white/30 text-xs">Loading questions...</p>
+                      </div>
+                    ) : filteredQuestions.length === 0 ? (
+                      <div className="text-center py-12">
+                        <ListChecks className="h-8 w-8 text-white/10 mx-auto mb-3" />
+                        <p className="text-white/30 text-xs">No questions for this level</p>
+                      </div>
+                    ) : (
+                      filteredQuestions.map((q, idx) => {
+                        const isAsked = askedSet.has(q.id);
+                        const diffColor = q.difficulty === "Easy"
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          : q.difficulty === "Medium"
+                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                            : "bg-red-500/10 text-red-400 border-red-500/20";
+                        return (
+                          <button
+                            key={q.id}
+                            onClick={() => toggleAsked(q.id)}
+                            className={`w-full text-left p-3 rounded-xl border transition-all duration-200 group relative ${
+                              isAsked
+                                ? "bg-emerald-500/5 border-emerald-500/15 opacity-60"
+                                : "bg-white/[0.02] border-white/5 hover:border-white/15 hover:bg-white/[0.04]"
+                            }`}
+                          >
+                            {/* Question number + check */}
+                            <div className="flex items-start gap-2.5">
+                              <div className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center shrink-0 transition-all ${
+                                isAsked
+                                  ? "bg-emerald-500/20 text-emerald-400"
+                                  : "bg-white/5 text-white/20 group-hover:bg-white/10"
+                              }`}>
+                                {isAsked
+                                  ? <Check className="h-3 w-3" />
+                                  : <span className="text-[10px] font-mono">{idx + 1}</span>
+                                }
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-[13px] leading-relaxed ${
+                                  isAsked ? "line-through text-white/30" : "text-white/85"
+                                }`}>
+                                  {q.text}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-2">
+                                  {availableLevels.length > 1 && activeLevel === "all" && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                      {q.level || "L1"}
+                                    </span>
+                                  )}
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium border ${diffColor}`}>
+                                    {q.difficulty}
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] text-white/25 bg-white/[0.03] border border-white/5">
+                                    {q.category}
+                                  </span>
+                                </div>
+                              </div>
+                              {/* Arrow indicator */}
+                              <ChevronRight className={`h-3.5 w-3.5 mt-1 shrink-0 transition-all ${
+                                isAsked ? "text-emerald-500/30" : "text-white/10 group-hover:text-white/25"
+                              }`} />
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
-                )}
-
-                <div ref={transcriptEndRef} />
-              </div>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
