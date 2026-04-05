@@ -217,7 +217,7 @@ export function InterviewIntelligenceTab({ positionId, positionTitle }: Props) {
           ) : (
             <motion.div key={reportTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
               {reportTab === "interviewer" && <InterviewerReportView report={ir} />}
-              {reportTab === "candidate" && <CandidateReportView report={cr} />}
+              {reportTab === "candidate" && <CandidateReportView report={cr} tabSwitches={detail.tab_switch_count} />}
               {reportTab === "quality" && <QualityReportView report={iq} />}
               {reportTab === "transcript" && <TranscriptView transcript={detail.transcript} parsedQA={detail.parsed_transcript} candidateName={detail.candidate_name} />}
             </motion.div>
@@ -439,7 +439,7 @@ function InterviewerReportView({ report }: { report: any }) {
   );
 }
 
-function CandidateReportView({ report }: { report: any }) {
+function CandidateReportView({ report, tabSwitches = 0 }: { report: any; tabSwitches?: number }) {
   if (!report || Object.keys(report).length === 0) {
     return <Card className="glass-card p-8 text-center text-muted-foreground">No candidate report available.</Card>;
   }
@@ -462,6 +462,20 @@ function CandidateReportView({ report }: { report: any }) {
           <p className="text-sm text-muted-foreground leading-relaxed">{report.overall_performance}</p>
         </CardContent>
       </Card>
+
+      {/* Integrity Tracking */}
+      {tabSwitches > 0 && (
+        <Card className="glass-card border-red-500/20 bg-red-500/5">
+          <CardContent className="p-6">
+            <h3 className="text-sm font-bold text-red-500 mb-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" /> Integrity Warning
+            </h3>
+            <p className="text-sm text-red-400/90 leading-relaxed">
+              We detected that the candidate switched tabs or minimized the browser <span className="font-bold">{tabSwitches}</span> times during the interview. This behavior may indicate unauthorized assistance.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Strengths */}
       {report.strengths?.length > 0 && (

@@ -24,12 +24,13 @@ import {
   MessageSquare,
   Send,
 } from "lucide-react";
-import Peer, { MediaConnection } from "peerjs";
+import Peer, { MediaConnection, DataConnection } from "peerjs";
 import { interviewIntelligenceApi } from "@/lib/interviewIntelligenceApi";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useDeepgram } from "@/hooks/useDeepgram";
 import { ScreenShareButton } from "@/components/interview/ScreenShareButton";
 import { playChatNotification } from "@/utils/chatNotification";
+import { useTabTracker } from "@/hooks/useTabTracker";
 
 // ══════════════════════════════════════════════════════════════════════
 // TYPES
@@ -68,14 +69,18 @@ export default function InterviewRoom() {
   const savedSession = typeof window !== "undefined" ? sessionStorage.getItem(sessionKey) : null;
   const parsedSession = savedSession ? JSON.parse(savedSession) : null;
   const [preJoin, setPreJoin] = useState(!parsedSession);
-  const [userName, setUserName] = useState(parsedSession?.userName || (role === "host" ? "Interviewer" : "Candidate"));
+  const [userName, setUserName] = useState(parsedSession?.userName || "");
+  const [remoteName, setRemoteName] = useState<string>("");
+  
+  // ── Isolated Tab Tracker ──
+  const dataConnRef = useRef<DataConnection | null>(null);
+  const { tabSwitchCount, handleIncomingTabSwitchMessage } = useTabTracker(role, dataConnRef);
   
   const [transcript, setTranscript] = useState<TranscriptEntry[]>(parsedSession?.transcript || []);
   const [interimText, setInterimText] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(parsedSession?.elapsedSeconds || 0);
   const [isEnding, setIsEnding] = useState(false);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
-  const [remoteName, setRemoteName] = useState("");
 
   const [linkCopied, setLinkCopied] = useState(false);
   // remoteStreamReady removed — no longer needed with always-mounted video element
@@ -103,11 +108,10 @@ export default function InterviewRoom() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const peerRef = useRef<Peer | null>(null);
   const callRef = useRef<MediaConnection | null>(null);
-  const dataConnRef = useRef<any>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const entryIdRef = useRef(0);
   const timerRef = useRef<number | null>(null);
-  const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectTimerRef = useRef<number>(0);
   const remoteStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptLastFetchRef = useRef<string | null>(null);
@@ -292,6 +296,8 @@ export default function InterviewRoom() {
             if (prev.some((m) => m.id === payload.message.id)) return prev;
             return [...prev, { ...payload.message, isSelf: false }];
           });
+        } else if (payload.type === "tab-switch") {
+          handleIncomingTabSwitchMessage(payload);
         }
       });
     };
@@ -507,6 +513,8 @@ export default function InterviewRoom() {
               if (prev.some((m) => m.id === payload.message.id)) return prev;
               return [...prev, { ...payload.message, isSelf: false }];
             });
+          } else if (payload.type === "tab-switch") {
+            handleIncomingTabSwitchMessage(payload);
           }
         });
       }
@@ -643,7 +651,7 @@ export default function InterviewRoom() {
     // Save transcript & trigger AI analysis
     if (role === "host" && scheduleId && fullTranscript.length > 20) {
       try {
-        await interviewIntelligenceApi.endInterview(scheduleId, fullTranscript, elapsedSeconds);
+        await interviewIntelligenceApi.endInterview(scheduleId, fullTranscript, elapsedSeconds, tabSwitchCount);
       } catch (err) {
         console.error("Failed to save transcript:", err);
       }
@@ -1229,7 +1237,6 @@ export default function InterviewRoom() {
           peerCallRef={callRef}
           localStreamRef={localStreamRef}
           localVideoRef={localVideoRef}
-          remoteVideoRef={remoteVideoRef}
           isConnected={connectionStatus === "connected"}
         />
 

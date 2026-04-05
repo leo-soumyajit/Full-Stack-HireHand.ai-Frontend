@@ -22,16 +22,18 @@ export interface InterviewAnalysisFull extends InterviewAnalysisListItem {
   candidate_report?: any;
   interviewer_quality?: any;
   error?: string | null;
+  tab_switch_count?: number;
 }
 
 export const interviewIntelligenceApi = {
-  endInterview: async (scheduleId: string, transcript: string, durationSeconds: number) => {
+  endInterview: async (scheduleId: string, transcript: string, durationSeconds: number, tabSwitchCount: number = 0) => {
     return apiFetch<{ id: string; status: string; message: string }>("/api/interview-intelligence/end-interview", {
       method: "POST",
       body: JSON.stringify({
         schedule_id: scheduleId,
         transcript,
         duration_seconds: durationSeconds,
+        tab_switch_count: tabSwitchCount,
       }),
     });
   },
