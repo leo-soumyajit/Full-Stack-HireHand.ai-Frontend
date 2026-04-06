@@ -35,11 +35,13 @@ import {
 interface Props {
   positionId: string;
   positionTitle: string;
+  candidateId?: string;
+  candidateName?: string;
 }
 
 type ReportTab = "interviewer" | "candidate" | "quality" | "transcript";
 
-export function InterviewIntelligenceTab({ positionId, positionTitle }: Props) {
+export function InterviewIntelligenceTab({ positionId, positionTitle, candidateId, candidateName }: Props) {
   const [analyses, setAnalyses] = useState<InterviewAnalysisListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -50,14 +52,20 @@ export function InterviewIntelligenceTab({ positionId, positionTitle }: Props) {
   const fetchAnalyses = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await interviewIntelligenceApi.listForPosition(positionId);
+      let data = await interviewIntelligenceApi.listForPosition(positionId);
+      if (candidateId) {
+        data = data.filter(a => a.candidate_id === candidateId || (candidateName && a.candidate_name === candidateName));
+      }
       setAnalyses(data);
+      if (candidateId && data.length > 0 && !selectedId) {
+        openDetail(data[0].id);
+      }
     } catch (err) {
       console.error("Failed to load analyses:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [positionId]);
+  }, [positionId, candidateId, candidateName]);
 
   useEffect(() => { fetchAnalyses(); }, [fetchAnalyses]);
 
@@ -128,13 +136,15 @@ export function InterviewIntelligenceTab({ positionId, positionTitle }: Props) {
 
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-        {/* Back Button */}
-        <button
-          onClick={() => { setSelectedId(null); setDetail(null); }}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to analyses
-        </button>
+        {/* Back Button - Only show if not in Candidate Profile mode */}
+        {!candidateId && (
+          <button
+            onClick={() => { setSelectedId(null); setDetail(null); }}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to analyses
+          </button>
+        )}
 
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -224,6 +234,17 @@ export function InterviewIntelligenceTab({ positionId, positionTitle }: Props) {
           )}
         </AnimatePresence>
       </motion.div>
+    );
+  }
+
+  // If candidate mode and no interview found
+  if (candidateId && analyses.length === 0 && !isLoading) {
+    return (
+      <div className="py-16 mt-8 border-2 border-dashed border-border/50 rounded-2xl text-center bg-muted/10">
+        <Video className="h-10 w-10 text-muted-foreground mx-auto mb-4 opacity-50" />
+        <p className="text-muted-foreground text-lg">No Interview Intelligence found.</p>
+        <p className="text-sm text-muted-foreground/60 mt-2">This candidate hasn't completed an AI interview yet.</p>
+      </div>
     );
   }
 

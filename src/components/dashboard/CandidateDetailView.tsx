@@ -31,6 +31,7 @@ import {
 import { FitmentReportPanel } from "./FitmentReportPanel";
 import { PsychometricScoringModal } from "./PsychometricScoringModal";
 import { SchedulingModal } from "./SchedulingModal";
+import { InterviewIntelligenceTab } from "./InterviewIntelligenceTab";
 import { ApiCandidate } from "@/types/api";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch, candidatesApi, assessmentApi } from "@/lib/api";
@@ -279,9 +280,10 @@ export function CandidateDetailView({ candidateId, positionId, initialTab = "res
         ) : (
           <div className="max-w-5xl mx-auto space-y-6 mt-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+              <TabsList className="grid w-full grid-cols-3 max-w-[500px]">
                 <TabsTrigger value="resume">Resume Analysis</TabsTrigger>
                 <TabsTrigger value="psychometric">Fitment Report</TabsTrigger>
+                <TabsTrigger value="interview">Interview Record</TabsTrigger>
               </TabsList>
 
               <TabsContent value="resume" className="space-y-8 mt-6">
@@ -397,6 +399,15 @@ export function CandidateDetailView({ candidateId, positionId, initialTab = "res
                 positionId={positionId}
                 initialReport={newlyGeneratedReport}
                 onOpenScoring={() => setScoringModalOpen(true)}
+              />
+            </TabsContent>
+
+            <TabsContent value="interview" className="mt-6">
+              <InterviewIntelligenceTab 
+                positionId={positionId} 
+                positionTitle={candidate.role || "Position"} 
+                candidateId={candidateId} 
+                candidateName={candidate.name} 
               />
             </TabsContent>
             </Tabs>

@@ -3,6 +3,7 @@ import { apiFetch } from "./api";
 export interface InterviewAnalysisListItem {
   id: string;
   schedule_id: string;
+  candidate_id: string;
   candidate_name: string;
   position_title: string;
   status: "processing" | "completed" | "failed";
