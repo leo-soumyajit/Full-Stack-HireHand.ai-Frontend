@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
+  Copy,
   Download,
   UserPlus,
   Users,
@@ -1134,6 +1135,53 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
           >
             <Download className="h-4 w-4 mr-2" />
             Export PDF
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="border-border/50 hover:bg-muted"
+            onClick={() => {
+              const lines: string[] = [];
+              lines.push(`📌 ${position.title}`);
+              lines.push(`📍 ${position.location} • ${position.business_unit}`);
+              lines.push(`🆔 ${position.req_id}`);
+              lines.push('');
+              if (jd.purpose) {
+                lines.push('🎯 ROLE PURPOSE');
+                lines.push(jd.purpose);
+                lines.push('');
+              }
+              if (jd.education?.length) {
+                lines.push('🎓 EDUCATION');
+                jd.education.forEach((e: string) => lines.push(`• ${e}`));
+                lines.push('');
+              }
+              if (jd.experience?.length) {
+                lines.push('⏳ EXPERIENCE');
+                jd.experience.forEach((e: string) => lines.push(`• ${e}`));
+                lines.push('');
+              }
+              if (jd.responsibilities?.length) {
+                lines.push('📋 KEY RESPONSIBILITIES');
+                jd.responsibilities.forEach((r: string, i: number) => lines.push(`${i + 1}. ${r}`));
+                lines.push('');
+              }
+              if (jd.skills?.length) {
+                lines.push('🛠️ SKILLS');
+                lines.push(jd.skills.join(' • '));
+                lines.push('');
+              }
+              lines.push('—');
+              lines.push('Powered by HireHand AI');
+              navigator.clipboard.writeText(lines.join('\n')).then(() => {
+                toast({ title: '✅ JD Copied!', description: 'Formatted Job Description copied to clipboard. Paste it on LinkedIn, Naukri, Indeed, or anywhere.' });
+              }).catch(() => {
+                toast({ title: 'Copy Failed', description: 'Could not copy to clipboard.', variant: 'destructive' });
+              });
+            }}
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Copy JD for Posting
           </Button>
           <Button 
             variant="outline" 
