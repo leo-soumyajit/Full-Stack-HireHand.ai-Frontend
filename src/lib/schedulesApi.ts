@@ -12,6 +12,7 @@ export interface ApiSchedule {
   scheduled_at: string;
   meeting_link: string;
   room_id?: string;
+  interview_round: number;
   status: string;
   created_at: string;
 }
