@@ -149,7 +149,14 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-foreground font-display">{detail.candidate_name}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-foreground font-display">{detail.candidate_name}</h2>
+              {detail.interview_round && (
+                <Badge variant="outline" className="text-xs font-bold bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
+                  L{detail.interview_round}
+                </Badge>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground mt-1">
               {detail.position_title} · {Math.round(detail.duration_seconds / 60)} min · {detail.created_at?.slice(0, 10)}
             </p>
@@ -318,6 +325,11 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-foreground text-sm truncate">{a.candidate_name}</p>
+                      {a.interview_round && (
+                        <Badge variant="outline" className="text-[10px] shrink-0 font-bold bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
+                          L{a.interview_round}
+                        </Badge>
+                      )}
                       {a.verdict && (
                         <Badge variant="outline" className={`text-[10px] shrink-0 ${verdictColor(a.verdict)}`}>
                           {a.verdict}

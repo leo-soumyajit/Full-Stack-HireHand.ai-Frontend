@@ -11,6 +11,7 @@ export interface InterviewAnalysisListItem {
   created_at: string;
   overall_score?: number | null;
   verdict?: string | null;
+  interview_round?: number | null;
 }
 
 export interface InterviewAnalysisFull extends InterviewAnalysisListItem {
