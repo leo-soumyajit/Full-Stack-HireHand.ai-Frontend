@@ -57,8 +57,10 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
         data = data.filter(a => a.candidate_id === candidateId || (candidateName && a.candidate_name === candidateName));
       }
       setAnalyses(data);
+      // Auto-open the LATEST interview round (highest round number)
       if (candidateId && data.length > 0 && !selectedId) {
-        openDetail(data[0].id);
+        const sorted = [...data].sort((a, b) => (b.interview_round ?? 0) - (a.interview_round ?? 0));
+        openDetail(sorted[0].id);
       }
     } catch (err) {
       console.error("Failed to load analyses:", err);
@@ -144,6 +146,33 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
           >
             <ArrowLeft className="h-4 w-4" /> Back to analyses
           </button>
+        )}
+
+        {/* Round Switcher — shown when candidate has multiple interview rounds */}
+        {candidateId && analyses.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-medium mr-1">Interview Rounds:</span>
+            {[...analyses]
+              .sort((a, b) => (a.interview_round ?? 1) - (b.interview_round ?? 1))
+              .map((a) => (
+                <button
+                  key={a.id}
+                  onClick={() => openDetail(a.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    selectedId === a.id
+                      ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-sm"
+                      : "text-muted-foreground hover:text-foreground bg-muted/30 border border-transparent hover:border-border/40"
+                  }`}
+                >
+                  L{a.interview_round ?? 1}
+                  {a.overall_score != null && (
+                    <span className={`ml-1.5 ${scoreColor(a.overall_score)}`}>
+                      ({a.overall_score})
+                    </span>
+                  )}
+                </button>
+              ))}
+          </div>
         )}
 
         {/* Header */}
