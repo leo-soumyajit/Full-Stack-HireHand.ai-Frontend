@@ -68,6 +68,8 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
       };
       
       printRef.current.style.display = "block";
+      // Allow browser to calculate layout and paint before html2canvas captures
+      await new Promise((resolve) => setTimeout(resolve, 50));
       await html2pdf().from(printRef.current).set(opt).save();
     } catch (e) {
       console.error("PDF generation failed:", e);
@@ -306,8 +308,8 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
           )}
         </AnimatePresence>
 
-        {/* Hidden template for PDF export */}
-        <div style={{ display: "none" }}>
+        {/* Hidden template for PDF export — rendered absolutely behind UI to avoid flashing or layout shifts, but visible enough for html2canvas */}
+        <div style={{ display: "none", position: "absolute", top: 0, left: 0, zIndex: -100 }}>
           <PrintableInterviewReport ref={printRef} detail={detail} />
         </div>
       </motion.div>

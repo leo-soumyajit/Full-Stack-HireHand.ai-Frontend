@@ -14,9 +14,6 @@ export const PrintableInterviewReport = React.forwardRef<HTMLDivElement, Props>(
     <div
       ref={ref}
       style={{
-        position: "absolute",
-        top: "-9999px",
-        left: "-9999px",
         width: "800px", // A4 width proportion
         backgroundColor: "white",
         color: "black",
