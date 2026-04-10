@@ -92,12 +92,12 @@ export function useDeepgram(
         // 2. Open WebSocket to Deepgram
         const dgUrl =
           "wss://api.deepgram.com/v1/listen?" +
-          "model=nova-2-general&" +
-          "language=en-IN&" +
+          "model=nova-3&" +
+          "language=multi&" +
           "smart_format=true&" +
           "interim_results=true&" +
           "punctuate=true&" +
-          "endpointing=300";
+          "endpointing=100";
 
         const socket = new WebSocket(dgUrl, ["token", key]);
         socketRef.current = socket;
