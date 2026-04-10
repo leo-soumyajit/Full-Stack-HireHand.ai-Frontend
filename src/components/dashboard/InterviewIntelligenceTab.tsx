@@ -22,6 +22,7 @@ import {
   Sparkles,
   FileText,
   XCircle,
+  Download,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ import {
   type InterviewAnalysisListItem,
   type InterviewAnalysisFull,
 } from "@/lib/interviewIntelligenceApi";
+import { PrintableInterviewReport } from "./PrintableInterviewReport";
 
 interface Props {
   positionId: string;
@@ -48,6 +50,32 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
   const [detail, setDetail] = useState<InterviewAnalysisFull | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [reportTab, setReportTab] = useState<ReportTab>("interviewer");
+  const [isDownloading, setIsDownloading] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadPdf = async () => {
+    if (!printRef.current || !detail) return;
+    setIsDownloading(true);
+    try {
+      // @ts-ignore
+      const html2pdf = (await import("html2pdf.js")).default;
+      const opt = {
+        margin: [15, 0, 15, 0],
+        filename: `HireHand_Report_${detail.candidate_name}_L${detail.interview_round ?? 1}.pdf`,
+        image: { type: "jpeg", quality: 1 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      };
+      
+      printRef.current.style.display = "block";
+      await html2pdf().from(printRef.current).set(opt).save();
+    } catch (e) {
+      console.error("PDF generation failed:", e);
+    } finally {
+      setIsDownloading(false);
+      if (printRef.current) printRef.current.style.display = "none";
+    }
+  };
 
   const fetchAnalyses = useCallback(async () => {
     setIsLoading(true);
@@ -189,6 +217,16 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-10 bg-muted/30 border-border/60 hover:bg-muted/50 hidden sm:flex"
+              onClick={handleDownloadPdf}
+              disabled={isDownloading}
+            >
+              {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              {isDownloading ? "Generating PDF..." : "Download Report"}
+            </Button>
             <div className={`text-3xl font-bold font-display ${scoreColor(detail.overall_score)}`}>
               {detail.overall_score ?? "—"}
             </div>
@@ -267,6 +305,11 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Hidden template for PDF export */}
+        <div style={{ display: "none" }}>
+          <PrintableInterviewReport ref={printRef} detail={detail} />
+        </div>
       </motion.div>
     );
   }
