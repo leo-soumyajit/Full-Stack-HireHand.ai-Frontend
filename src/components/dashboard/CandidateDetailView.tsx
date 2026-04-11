@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   ArrowLeft, Download, Briefcase, Mail, CheckCircle2, AlertCircle, Loader2, Sparkles, BrainCircuit,
@@ -76,7 +77,11 @@ export function CandidateDetailView({ candidateId, positionId, initialTab = "res
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [schedulingModalOpen, setSchedulingModalOpen] = useState(false);
   const [newlyGeneratedReport, setNewlyGeneratedReport] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("ct") || initialTab;
+  const setActiveTab = (tab: string) => {
+    setSearchParams(prev => { prev.set("ct", tab); return prev; }, { replace: true });
+  };
   const { toast } = useToast();
 
   useEffect(() => {
