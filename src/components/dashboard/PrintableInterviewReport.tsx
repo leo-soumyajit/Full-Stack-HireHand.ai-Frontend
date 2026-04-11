@@ -181,6 +181,7 @@ export const PrintableInterviewReport = React.forwardRef<HTMLDivElement, Props>(
           </div>
         )}
         </div>
+        </>
       )}
 
       {/* ======================= PAGE 2: CANDIDATE FEEDBACK ======================= */}
