@@ -25,14 +25,23 @@ import {
   Download,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+  import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   interviewIntelligenceApi,
   type InterviewAnalysisListItem,
   type InterviewAnalysisFull,
 } from "@/lib/interviewIntelligenceApi";
-import { PrintableInterviewReport } from "./PrintableInterviewReport";
+import { PrintableInterviewReport, type PrintConfig } from "./PrintableInterviewReport";
 
 interface Props {
   positionId: string;
@@ -51,6 +60,13 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
   const [detailLoading, setDetailLoading] = useState(false);
   const [reportTab, setReportTab] = useState<ReportTab>("interviewer");
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [printConfig, setPrintConfig] = useState<PrintConfig>({
+    overview: true,
+    candidateFeedback: true,
+    interviewerQuality: true,
+    transcript: true
+  });
   const printRef = useRef<HTMLDivElement>(null);
 
   const handleDownloadPdf = async () => {
@@ -223,7 +239,7 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
               variant="outline" 
               size="sm" 
               className="h-10 bg-muted/30 border-border/60 hover:bg-muted/50 hidden sm:flex"
-              onClick={handleDownloadPdf}
+              onClick={() => setIsExportDialogOpen(true)}
               disabled={isDownloading}
             >
               {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
@@ -310,8 +326,73 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
 
         {/* Hidden template for PDF export — rendered absolutely behind UI to avoid flashing or layout shifts, but visible enough for html2canvas */}
         <div style={{ display: "none", position: "absolute", top: 0, left: 0, zIndex: -100 }}>
-          <PrintableInterviewReport ref={printRef} detail={detail} />
+          <PrintableInterviewReport ref={printRef} detail={detail} config={printConfig} />
         </div>
+
+        {/* Export Configuration Dialog */}
+        <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+          <DialogContent className="sm:max-w-md glass-card border-border/50">
+            <DialogHeader>
+              <DialogTitle className="text-xl flex items-center gap-2">
+                <Download className="h-5 w-5 text-indigo-400" /> Export Custom Report
+              </DialogTitle>
+              <DialogDescription>
+                Select the sections you want to include in your generated PDF.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-4 py-4">
+              <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                <div className="space-y-0.5 mr-4">
+                  <h4 className="font-medium text-foreground">Overview & Recruiter Summary</h4>
+                  <p className="text-xs text-muted-foreground">Candidate profile, overall score, and exec summary.</p>
+                </div>
+                <Switch 
+                  checked={printConfig.overview} 
+                  onCheckedChange={(c) => setPrintConfig(p => ({ ...p, overview: c }))} 
+                />
+              </div>
+              <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                <div className="space-y-0.5 mr-4">
+                  <h4 className="font-medium text-foreground">Candidate Feedback</h4>
+                  <p className="text-xs text-muted-foreground">Strengths, improvements, and interview tips.</p>
+                </div>
+                <Switch 
+                  checked={printConfig.candidateFeedback} 
+                  onCheckedChange={(c) => setPrintConfig(p => ({ ...p, candidateFeedback: c }))} 
+                />
+              </div>
+              <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                <div className="space-y-0.5 mr-4">
+                  <h4 className="font-medium text-foreground">Interviewer Quality Audit</h4>
+                  <p className="text-xs text-muted-foreground">Coverage gaps, bias indicators, and JD alignment.</p>
+                </div>
+                <Switch 
+                  checked={printConfig.interviewerQuality} 
+                  onCheckedChange={(c) => setPrintConfig(p => ({ ...p, interviewerQuality: c }))} 
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5 mr-4">
+                  <h4 className="font-medium text-foreground">Full Interview Transcript</h4>
+                  <p className="text-xs text-muted-foreground">Complete Q&A trace from the live interview.</p>
+                </div>
+                <Switch 
+                  checked={printConfig.transcript} 
+                  onCheckedChange={(c) => setPrintConfig(p => ({ ...p, transcript: c }))} 
+                />
+              </div>
+            </div>
+            <DialogFooter className="mt-2">
+               <Button variant="ghost" onClick={() => setIsExportDialogOpen(false)}>Cancel</Button>
+               <Button onClick={() => {
+                   setIsExportDialogOpen(false);
+                   handleDownloadPdf();
+               }} className="bg-indigo-600 hover:bg-indigo-500 text-white" disabled={!printConfig.overview && !printConfig.candidateFeedback && !printConfig.interviewerQuality && !printConfig.transcript}>
+                  <FileText className="h-4 w-4 mr-2" /> Generate PDF
+               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </motion.div>
     );
   }

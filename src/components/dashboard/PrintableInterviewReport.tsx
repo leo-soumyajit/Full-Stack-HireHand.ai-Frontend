@@ -1,15 +1,26 @@
 import React from "react";
 import { type InterviewAnalysisFull } from "@/lib/interviewIntelligenceApi";
 
-interface Props {
-  detail: InterviewAnalysisFull;
+export interface PrintConfig {
+  overview: boolean;
+  candidateFeedback: boolean;
+  interviewerQuality: boolean;
+  transcript: boolean;
 }
 
-export const PrintableInterviewReport = React.forwardRef<HTMLDivElement, Props>(({ detail }, ref) => {
+interface Props {
+  detail: InterviewAnalysisFull;
+  config?: PrintConfig;
+}
+
+export const PrintableInterviewReport = React.forwardRef<HTMLDivElement, Props>(({ detail, config }, ref) => {
   const ir = detail.interviewer_report || {};
   const cr = detail.candidate_report || {};
   const iq = detail.interviewer_quality || {};
   const pt = detail.parsed_transcript?.parsed_qa || [];
+  
+  // Default to all true if no config provided for backward compatibility
+  const printConfig = config || { overview: true, candidateFeedback: true, interviewerQuality: true, transcript: true };
 
   return (
     <div
@@ -40,7 +51,9 @@ export const PrintableInterviewReport = React.forwardRef<HTMLDivElement, Props>(
         </div>
       </div>
 
-      <div style={{ backgroundColor: "#f8fafc", padding: "20px", borderRadius: "8px", marginBottom: "30px", border: "1px solid #e2e8f0" }}>
+      {printConfig.overview && (
+        <>
+          <div style={{ backgroundColor: "#f8fafc", padding: "20px", borderRadius: "8px", marginBottom: "30px", border: "1px solid #e2e8f0" }}>
         <h2 style={{ fontSize: "20px", fontWeight: "bold", margin: "0 0 15px 0", color: "#0f172a" }}>Candidate Profile</h2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "20px" }}>
           <div style={{ flex: "1 1 45%" }}>
@@ -167,10 +180,12 @@ export const PrintableInterviewReport = React.forwardRef<HTMLDivElement, Props>(
             </ul>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* ======================= PAGE 2: CANDIDATE FEEDBACK ======================= */}
-      <div style={{ pageBreakBefore: "always", paddingTop: "10px" }}>
+      {printConfig.candidateFeedback && (
+      <div style={{ pageBreakBefore: printConfig.overview ? "always" : "auto", paddingTop: "10px" }}>
         <h1 style={{ fontSize: "24px", fontWeight: "900", color: "#111827", borderBottom: "3px solid #6366f1", paddingBottom: "10px", marginBottom: "25px" }}>
           Candidate Performance Review
         </h1>
@@ -262,9 +277,11 @@ export const PrintableInterviewReport = React.forwardRef<HTMLDivElement, Props>(
           </div>
         )}
       </div>
+      )}
 
       {/* ======================= PAGE 3: INTERVIEWER QUALITY (Optional but requested) ======================= */}
-      <div style={{ pageBreakBefore: "always", paddingTop: "10px" }}>
+      {printConfig.interviewerQuality && (
+      <div style={{ pageBreakBefore: (printConfig.overview || printConfig.candidateFeedback) ? "always" : "auto", paddingTop: "10px" }}>
         <h1 style={{ fontSize: "24px", fontWeight: "900", color: "#111827", borderBottom: "3px solid #14b8a6", paddingBottom: "10px", marginBottom: "25px" }}>
           Interviewer Quality Audit
         </h1>
@@ -329,10 +346,11 @@ export const PrintableInterviewReport = React.forwardRef<HTMLDivElement, Props>(
           </div>
         )}
       </div>
+      )}
 
       {/* ======================= PAGE 4: TRANSCRIPT TRACE ======================= */}
-      {pt && pt.length > 0 && (
-        <div style={{ pageBreakBefore: "always", paddingTop: "10px" }}>
+      {printConfig.transcript && pt && pt.length > 0 && (
+        <div style={{ pageBreakBefore: (printConfig.overview || printConfig.candidateFeedback || printConfig.interviewerQuality) ? "always" : "auto", paddingTop: "10px" }}>
           <h1 style={{ fontSize: "24px", fontWeight: "900", color: "#111827", borderBottom: "3px solid #94a3b8", paddingBottom: "10px", marginBottom: "25px" }}>
             Analyzed Interview Transcript
           </h1>
