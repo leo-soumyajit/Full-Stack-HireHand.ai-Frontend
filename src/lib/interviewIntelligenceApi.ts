@@ -55,4 +55,19 @@ export const interviewIntelligenceApi = {
   retryAnalysis: async (analysisId: string): Promise<{ id: string; status: string; message: string }> => {
     return apiFetch<{ id: string; status: string; message: string }>(`/api/interview-intelligence/retry/${analysisId}`, { method: "POST" });
   },
+
+  sendReport: async (analysisId: string, payload: {
+    to_email: string;
+    subject?: string;
+    message_body?: string;
+    sender_name: string;
+    sender_email: string;
+    company_name?: string;
+    pdf_base64: string;
+  }) => {
+    return apiFetch<{ message: string }>(`/api/interview-intelligence/${analysisId}/send-report`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
 };

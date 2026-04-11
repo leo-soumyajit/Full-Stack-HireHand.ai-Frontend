@@ -23,11 +23,16 @@ import {
   FileText,
   XCircle,
   Download,
+  Mail,
+  Send,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-  import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";  
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +66,10 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
   const [reportTab, setReportTab] = useState<ReportTab>("interviewer");
   const [isDownloading, setIsDownloading] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [emailTargetAddress, setEmailTargetAddress] = useState("");
+  const [emailMessageBody, setEmailMessageBody] = useState("");
   const [printConfig, setPrintConfig] = useState<PrintConfig>({
     overview: true,
     candidateFeedback: true,
@@ -68,6 +77,64 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
     transcript: true
   });
   const printRef = useRef<HTMLDivElement>(null);
+
+  const handleSendEmail = async () => {
+    if (!printRef.current || !detail || !emailTargetAddress) return;
+    setIsSendingEmail(true);
+    try {
+      // @ts-ignore
+      const html2pdf = (await import("html2pdf.js")).default;
+      const opt = {
+        margin: [15, 0, 15, 0],
+        filename: `HireHand_Report_${detail.candidate_name}_L${detail.interview_round ?? 1}.pdf`,
+        image: { type: "jpeg", quality: 1 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      };
+      
+      printRef.current.style.display = "block";
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const pdfBase64 = await html2pdf().from(printRef.current).set(opt).output('datauristring');
+      
+      let senderName = "HireHand Recruiter";
+      let senderEmail = "updates@hirehand.ai";
+      let companyName = "HireHand AI";
+      try {
+        const authData = localStorage.getItem('hirehand-auth-storage');
+        if (authData) {
+          const parsed = JSON.parse(authData);
+          const user = parsed?.state?.user;
+          if (user) {
+             senderName = user.name || senderName;
+             senderEmail = user.email || senderEmail;
+             companyName = user.company_name || companyName;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse auth data", e);
+      }
+
+      await interviewIntelligenceApi.sendReport(detail.id, {
+        to_email: emailTargetAddress,
+        message_body: emailMessageBody,
+        sender_name: senderName,
+        sender_email: senderEmail,
+        company_name: companyName,
+        pdf_base64: pdfBase64,
+      });
+
+      setIsSendEmailDialogOpen(false);
+      setEmailTargetAddress("");
+      setEmailMessageBody("");
+      alert("Report sent successfully!");
+    } catch (e) {
+      console.error("Email send failed:", e);
+      alert("Failed to send report. Check console for details.");
+    } finally {
+      setIsSendingEmail(false);
+      if (printRef.current) printRef.current.style.display = "none";
+    }
+  };
 
   const handleDownloadPdf = async () => {
     if (!printRef.current || !detail) return;
@@ -240,10 +307,19 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
               size="sm" 
               className="h-10 bg-muted/30 border-border/60 hover:bg-muted/50 hidden sm:flex"
               onClick={() => setIsExportDialogOpen(true)}
-              disabled={isDownloading}
+              disabled={isDownloading || isSendingEmail}
             >
               {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
               {isDownloading ? "Generating PDF..." : "Download Report"}
+            </Button>
+            <Button 
+              size="sm" 
+              className="h-10 bg-indigo-500 hover:bg-indigo-600 text-white shadow-sm hidden sm:flex border-none"
+              onClick={() => setIsSendEmailDialogOpen(true)}
+              disabled={isDownloading || isSendingEmail}
+            >
+              {isSendingEmail ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+              {isSendingEmail ? "Sending..." : "Send Mail"}
             </Button>
             <div className={`text-3xl font-bold font-display ${scoreColor(detail.overall_score)}`}>
               {detail.overall_score ?? "—"}
@@ -389,6 +465,83 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
                    handleDownloadPdf();
                }} className="bg-indigo-600 hover:bg-indigo-500 text-white" disabled={!printConfig.overview && !printConfig.candidateFeedback && !printConfig.interviewerQuality && !printConfig.transcript}>
                   <FileText className="h-4 w-4 mr-2" /> Generate PDF
+               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Send Email Modal */}
+        <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
+          <DialogContent className="sm:max-w-xl bg-background/95 backdrop-blur-xl border-border/50">
+            <DialogHeader>
+              <DialogTitle className="text-xl flex items-center gap-2">
+                <Send className="h-5 w-5 text-indigo-400" /> Send Animated Report
+              </DialogTitle>
+              <DialogDescription>
+                Compose a message and select the sections to include in the exported report PDF attachment.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-5 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="to_email" className="text-foreground font-medium">To Email</Label>
+                <Input 
+                  id="to_email" 
+                  placeholder="recipient@example.com" 
+                  value={emailTargetAddress}
+                  onChange={(e) => setEmailTargetAddress(e.target.value)}
+                  className="bg-muted/30 border-border/60"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="message" className="text-foreground font-medium">Custom Message (Optional)</Label>
+                <Textarea 
+                  id="message" 
+                  placeholder="e.g. Here is the detailed AI assessment report for the candidate..." 
+                  value={emailMessageBody}
+                  onChange={(e) => setEmailMessageBody(e.target.value)}
+                  className="bg-muted/30 border-border/60 min-h-[100px] resize-none"
+                />
+              </div>
+
+              <div className="border-t border-border/30 pt-4 mt-2">
+                <h4 className="text-sm font-semibold mb-3">Report Sections to Attach</h4>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between border-b border-border/20 pb-2">
+                    <div className="space-y-0.5">
+                      <h4 className="font-medium text-sm text-foreground">Overview & Recruiter Summary</h4>
+                    </div>
+                    <Switch checked={printConfig.overview} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, overview: c }))} />
+                  </div>
+                  <div className="flex items-center justify-between border-b border-border/20 pb-2">
+                    <div className="space-y-0.5">
+                      <h4 className="font-medium text-sm text-foreground">Candidate Feedback</h4>
+                    </div>
+                    <Switch checked={printConfig.candidateFeedback} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, candidateFeedback: c }))} />
+                  </div>
+                  <div className="flex items-center justify-between border-b border-border/20 pb-2">
+                    <div className="space-y-0.5">
+                      <h4 className="font-medium text-sm text-foreground">Interviewer Quality Audit</h4>
+                    </div>
+                    <Switch checked={printConfig.interviewerQuality} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, interviewerQuality: c }))} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <h4 className="font-medium text-sm text-foreground">Full Interview Transcript</h4>
+                    </div>
+                    <Switch checked={printConfig.transcript} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, transcript: c }))} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="mt-2 text-right">
+               <Button variant="ghost" onClick={() => setIsSendEmailDialogOpen(false)} disabled={isSendingEmail}>Cancel</Button>
+               <Button 
+                 onClick={handleSendEmail} 
+                 className="bg-indigo-600 hover:bg-indigo-500 text-white" 
+                 disabled={isSendingEmail || !emailTargetAddress || (!printConfig.overview && !printConfig.candidateFeedback && !printConfig.interviewerQuality && !printConfig.transcript)}
+               >
+                  {isSendingEmail ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                  {isSendingEmail ? "Sending..." : "Send Email"}
                </Button>
             </DialogFooter>
           </DialogContent>
