@@ -497,7 +497,7 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
             <DialogHeader>
               <div className="flex items-center justify-between mt-2">
                 <DialogTitle className="text-xl flex items-center gap-2">
-                  <Send className="h-5 w-5 text-indigo-400" /> Send Animated Report
+                  <Send className="h-5 w-5 text-indigo-400" /> Share Interview Report
                 </DialogTitle>
                 <div className="flex items-center bg-muted/50 rounded-full p-1 text-xs font-semibold mr-6">
                   <span className={`px-2.5 py-1 rounded-full mix-blend-multiply ${emailStep === 1 ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>1. Details</span>
@@ -509,7 +509,7 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
               </DialogDescription>
             </DialogHeader>
 
-            <div className="relative overflow-hidden w-full min-h-[300px]">
+            <div className="relative overflow-hidden w-full">
               <AnimatePresence mode="wait">
                 {emailStep === 1 ? (
                   <motion.div 
@@ -518,16 +518,16 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
                     animate={{ x: 0, opacity: 1 }} 
                     exit={{ x: "-100%", opacity: 0 }}
                     transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                    className="absolute inset-0 flex flex-col gap-6 py-4"
+                    className="flex flex-col gap-6 py-4"
                   >
                     <div className="space-y-2">
                       <Label htmlFor="to_email" className="text-foreground font-medium flex justify-between">
                         To Email
-                        <span className="text-xs text-red-400 font-normal">*Required</span>
+                        <span className="text-xs text-muted-foreground font-normal">Use commas for multiple</span>
                       </Label>
                       <Input 
                         id="to_email" 
-                        placeholder="recipient@example.com" 
+                        placeholder="recipient1@example.com, recipient2@example.com" 
                         value={emailTargetAddress}
                         onChange={(e) => setEmailTargetAddress(e.target.value)}
                         className="bg-muted/30 border-border/60 focus-visible:ring-indigo-500/30"
@@ -551,7 +551,7 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
                     animate={{ x: 0, opacity: 1 }} 
                     exit={{ x: "100%", opacity: 0 }}
                     transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                    className="absolute inset-0 flex flex-col gap-4 py-4"
+                    className="flex flex-col gap-4 py-4"
                   >
                     {emailError && (
                       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-red-500/10 border border-red-500/20 text-red-500 text-sm p-3 rounded-lg flex items-start gap-2 mb-2">
