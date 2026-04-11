@@ -178,10 +178,23 @@ export function CompanyProfile() {
       }
       
       const responseData = await response.json();
-      setFormData(prev => ({ 
-        ...prev, 
-        [type === 'avatar' ? 'avatar_url' : 'cover_url']: responseData.url 
-      }));
+      const fieldKey = type === 'avatar' ? 'avatar_url' : 'cover_url';
+      const newUrl = responseData.url;
+      
+      setFormData(prev => ({ ...prev, [fieldKey]: newUrl }));
+      
+      // Auto-save to backend so image persists on refresh
+      try {
+        const updatedUser = await apiFetch<any>('/api/auth/profile', {
+          method: 'PUT',
+          body: JSON.stringify({ [fieldKey]: newUrl }),
+        });
+        if (token && updatedUser) {
+          login(updatedUser, token);
+        }
+      } catch (saveErr) {
+        console.warn('Auto-save after upload failed:', saveErr);
+      }
       
       toast({ title: 'Success', description: `${type === 'avatar' ? 'Profile picture' : 'Cover photo'} uploaded successfully.` });
     } catch (e: any) {
