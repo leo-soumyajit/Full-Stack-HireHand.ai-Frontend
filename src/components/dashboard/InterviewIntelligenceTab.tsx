@@ -331,7 +331,7 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
 
         {/* Export Configuration Dialog */}
         <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
-          <DialogContent className="sm:max-w-md glass-card border-border/50">
+          <DialogContent className="sm:max-w-md bg-background/95 backdrop-blur-xl border-border/50">
             <DialogHeader>
               <DialogTitle className="text-xl flex items-center gap-2">
                 <Download className="h-5 w-5 text-indigo-400" /> Export Custom Report
