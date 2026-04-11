@@ -67,6 +67,8 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
   const [isDownloading, setIsDownloading] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false);
+  const [emailStep, setEmailStep] = useState<1 | 2>(1);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailTargetAddress, setEmailTargetAddress] = useState("");
   const [emailMessageBody, setEmailMessageBody] = useState("");
@@ -124,12 +126,22 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
       });
 
       setIsSendEmailDialogOpen(false);
+      setEmailStep(1);
       setEmailTargetAddress("");
       setEmailMessageBody("");
-      alert("Report sent successfully!");
-    } catch (e) {
+      // Add a small success effect
+      const successMsg = document.createElement("div");
+      successMsg.innerText = "Report Sent Successfully!";
+      successMsg.className = "fixed bottom-5 right-5 bg-green-500 text-white px-4 py-3 rounded-xl shadow-lg font-medium z-50 animate-in fade-in slide-in-from-bottom-5";
+      document.body.appendChild(successMsg);
+      setTimeout(() => successMsg.remove(), 4000);
+    } catch (e: any) {
       console.error("Email send failed:", e);
-      alert("Failed to send report. Check console for details.");
+      let errMsg = "Failed to send report. Request might be too large or network error.";
+      if (e?.response?.status === 413) {
+        errMsg = "Error 413: Generated PDF is too large to send. Reduce selected sections.";
+      }
+      setEmailError(errMsg);
     } finally {
       setIsSendingEmail(false);
       if (printRef.current) printRef.current.style.display = "none";
@@ -471,78 +483,153 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
         </Dialog>
 
         {/* Send Email Modal */}
-        <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
-          <DialogContent className="sm:max-w-xl bg-background/95 backdrop-blur-xl border-border/50">
+        <Dialog 
+          open={isSendEmailDialogOpen} 
+          onOpenChange={(open) => {
+            if (!open) {
+               setEmailStep(1);
+               setEmailError(null);
+            }
+            setIsSendEmailDialogOpen(open);
+          }}
+        >
+          <DialogContent className="sm:max-w-xl bg-background/95 backdrop-blur-xl border-border/50 overflow-hidden">
             <DialogHeader>
-              <DialogTitle className="text-xl flex items-center gap-2">
-                <Send className="h-5 w-5 text-indigo-400" /> Send Animated Report
-              </DialogTitle>
-              <DialogDescription>
-                Compose a message and select the sections to include in the exported report PDF attachment.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col gap-5 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="to_email" className="text-foreground font-medium">To Email</Label>
-                <Input 
-                  id="to_email" 
-                  placeholder="recipient@example.com" 
-                  value={emailTargetAddress}
-                  onChange={(e) => setEmailTargetAddress(e.target.value)}
-                  className="bg-muted/30 border-border/60"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="message" className="text-foreground font-medium">Custom Message (Optional)</Label>
-                <Textarea 
-                  id="message" 
-                  placeholder="e.g. Here is the detailed AI assessment report for the candidate..." 
-                  value={emailMessageBody}
-                  onChange={(e) => setEmailMessageBody(e.target.value)}
-                  className="bg-muted/30 border-border/60 min-h-[100px] resize-none"
-                />
-              </div>
-
-              <div className="border-t border-border/30 pt-4 mt-2">
-                <h4 className="text-sm font-semibold mb-3">Report Sections to Attach</h4>
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between border-b border-border/20 pb-2">
-                    <div className="space-y-0.5">
-                      <h4 className="font-medium text-sm text-foreground">Overview & Recruiter Summary</h4>
-                    </div>
-                    <Switch checked={printConfig.overview} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, overview: c }))} />
-                  </div>
-                  <div className="flex items-center justify-between border-b border-border/20 pb-2">
-                    <div className="space-y-0.5">
-                      <h4 className="font-medium text-sm text-foreground">Candidate Feedback</h4>
-                    </div>
-                    <Switch checked={printConfig.candidateFeedback} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, candidateFeedback: c }))} />
-                  </div>
-                  <div className="flex items-center justify-between border-b border-border/20 pb-2">
-                    <div className="space-y-0.5">
-                      <h4 className="font-medium text-sm text-foreground">Interviewer Quality Audit</h4>
-                    </div>
-                    <Switch checked={printConfig.interviewerQuality} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, interviewerQuality: c }))} />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <h4 className="font-medium text-sm text-foreground">Full Interview Transcript</h4>
-                    </div>
-                    <Switch checked={printConfig.transcript} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, transcript: c }))} />
-                  </div>
+              <div className="flex items-center justify-between mt-2">
+                <DialogTitle className="text-xl flex items-center gap-2">
+                  <Send className="h-5 w-5 text-indigo-400" /> Send Animated Report
+                </DialogTitle>
+                <div className="flex items-center bg-muted/50 rounded-full p-1 text-xs font-semibold mr-6">
+                  <span className={`px-2.5 py-1 rounded-full mix-blend-multiply ${emailStep === 1 ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>1. Details</span>
+                  <span className={`px-2.5 py-1 rounded-full mix-blend-multiply ${emailStep === 2 ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>2. Content</span>
                 </div>
               </div>
+              <DialogDescription>
+                {emailStep === 1 ? "Start by providing the recipient details and a customized message." : "Select which sections of the AI assessment you want to attach as a PDF."}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="relative overflow-hidden w-full min-h-[300px]">
+              <AnimatePresence mode="wait">
+                {emailStep === 1 ? (
+                  <motion.div 
+                    key="step-1"
+                    initial={{ x: "-100%", opacity: 0 }} 
+                    animate={{ x: 0, opacity: 1 }} 
+                    exit={{ x: "-100%", opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                    className="absolute inset-0 flex flex-col gap-6 py-4"
+                  >
+                    <div className="space-y-2">
+                      <Label htmlFor="to_email" className="text-foreground font-medium flex justify-between">
+                        To Email
+                        <span className="text-xs text-red-400 font-normal">*Required</span>
+                      </Label>
+                      <Input 
+                        id="to_email" 
+                        placeholder="recipient@example.com" 
+                        value={emailTargetAddress}
+                        onChange={(e) => setEmailTargetAddress(e.target.value)}
+                        className="bg-muted/30 border-border/60 focus-visible:ring-indigo-500/30"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="message" className="text-foreground font-medium">Custom Message (Optional)</Label>
+                      <Textarea 
+                        id="message" 
+                        placeholder="e.g. Here is the detailed AI assessment report for the candidate..." 
+                        value={emailMessageBody}
+                        onChange={(e) => setEmailMessageBody(e.target.value)}
+                        className="bg-muted/30 border-border/60 min-h-[140px] resize-none focus-visible:ring-indigo-500/30"
+                      />
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div 
+                    key="step-2"
+                    initial={{ x: "100%", opacity: 0 }} 
+                    animate={{ x: 0, opacity: 1 }} 
+                    exit={{ x: "100%", opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                    className="absolute inset-0 flex flex-col gap-4 py-4"
+                  >
+                    {emailError && (
+                      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-red-500/10 border border-red-500/20 text-red-500 text-sm p-3 rounded-lg flex items-start gap-2 mb-2">
+                        <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-semibold block">Sending Failed</span>
+                          {emailError}
+                        </div>
+                      </motion.div>
+                    )}
+                    
+                    <div className="bg-muted/20 border border-border/40 rounded-xl p-4">
+                      <h4 className="text-sm font-semibold mb-4 text-indigo-400/80 flex items-center gap-2">
+                        <FileText className="h-4 w-4" /> Report Sections to Attach
+                      </h4>
+                      <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between border-b border-border/20 pb-3">
+                          <div className="space-y-0.5 max-w-[85%]">
+                            <h4 className="font-medium text-sm text-foreground">Overview & Recruiter Summary</h4>
+                            <p className="text-xs text-muted-foreground truncate">Candidate profile and overall score</p>
+                          </div>
+                          <Switch checked={printConfig.overview} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, overview: c }))} />
+                        </div>
+                        <div className="flex items-center justify-between border-b border-border/20 pb-3">
+                          <div className="space-y-0.5 max-w-[85%]">
+                            <h4 className="font-medium text-sm text-foreground">Candidate Feedback</h4>
+                            <p className="text-xs text-muted-foreground truncate">Strengths, improvements, tips</p>
+                          </div>
+                          <Switch checked={printConfig.candidateFeedback} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, candidateFeedback: c }))} />
+                        </div>
+                        <div className="flex items-center justify-between border-b border-border/20 pb-3">
+                          <div className="space-y-0.5 max-w-[85%]">
+                            <h4 className="font-medium text-sm text-foreground">Interviewer Quality Audit</h4>
+                            <p className="text-xs text-muted-foreground truncate">Coverage gaps, bias indicators</p>
+                          </div>
+                          <Switch checked={printConfig.interviewerQuality} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, interviewerQuality: c }))} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5 max-w-[85%]">
+                            <h4 className="font-medium text-sm text-foreground">Full Interview Transcript</h4>
+                            <p className="text-xs text-muted-foreground truncate">Complete Q&A trace</p>
+                          </div>
+                          <Switch checked={printConfig.transcript} onCheckedChange={(c) => setPrintConfig(p => ({ ...p, transcript: c }))} />
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-            <DialogFooter className="mt-2 text-right">
-               <Button variant="ghost" onClick={() => setIsSendEmailDialogOpen(false)} disabled={isSendingEmail}>Cancel</Button>
-               <Button 
-                 onClick={handleSendEmail} 
-                 className="bg-indigo-600 hover:bg-indigo-500 text-white" 
-                 disabled={isSendingEmail || !emailTargetAddress || (!printConfig.overview && !printConfig.candidateFeedback && !printConfig.interviewerQuality && !printConfig.transcript)}
-               >
-                  {isSendingEmail ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                  {isSendingEmail ? "Sending..." : "Send Email"}
-               </Button>
+
+            <DialogFooter className="mt-4 flex flex-row items-center border-t border-border/30 pt-4">
+               {emailStep === 1 ? (
+                 <div className="w-full flex justify-end gap-3">
+                   <Button variant="ghost" onClick={() => setIsSendEmailDialogOpen(false)}>Cancel</Button>
+                   <Button 
+                     onClick={() => setEmailStep(2)} 
+                     className="bg-indigo-600 hover:bg-indigo-500 text-white" 
+                     disabled={!emailTargetAddress}
+                   >
+                     Continue <ChevronRight className="h-4 w-4 ml-1" />
+                   </Button>
+                 </div>
+               ) : (
+                 <div className="w-full flex justify-between gap-3">
+                   <Button variant="outline" onClick={() => { setEmailStep(1); setEmailError(null); }} className="bg-background" disabled={isSendingEmail}>
+                      <ArrowLeft className="h-4 w-4 mr-2" /> Back
+                   </Button>
+                   <Button 
+                     onClick={handleSendEmail} 
+                     className="bg-indigo-600 hover:bg-indigo-500 text-white" 
+                     disabled={isSendingEmail || (!printConfig.overview && !printConfig.candidateFeedback && !printConfig.interviewerQuality && !printConfig.transcript)}
+                   >
+                      {isSendingEmail ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                      {isSendingEmail ? "Securing & Sending..." : "Send Final Email"}
+                   </Button>
+                 </div>
+               )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
