@@ -50,6 +50,7 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
   const [test, setTest] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState(0);
   const [showConfig, setShowConfig] = useState(false);
   const [timeLimit, setTimeLimit] = useState(15);
   const [numQuestions, setNumQuestions] = useState(10);
@@ -83,6 +84,26 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
       setNumQuestions(hybridTotal);
     }
   }, [hybridTotal, questionType]);
+
+  const LOADING_PHASES = useMemo(() => [
+    { text: "Initializing predictive models...", progress: 10 },
+    { text: "Analyzing job description & core traits...", progress: 30 },
+    { text: "Synthesizing scenario parameters...", progress: 45 },
+    { text: "Generating complex cognitive choices...", progress: 65 },
+    { text: "Calibrating distractors & difficulty...", progress: 85 },
+    { text: "Final polishing... Almost done!", progress: 95 }
+  ], []);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isGenerating) {
+      setLoadingPhase(0);
+      interval = setInterval(() => {
+        setLoadingPhase(prev => (prev < LOADING_PHASES.length - 1 ? prev + 1 : prev));
+      }, Math.max(12000, 150000 / LOADING_PHASES.length)); // dynamically pace based on a safe 150s max timeout estimation
+    }
+    return () => clearInterval(interval);
+  }, [isGenerating, LOADING_PHASES.length]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -436,13 +457,34 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
                      </Badge>
                    </div>
 
-                   <Button 
-                     onClick={handleGenerateTest} 
-                     disabled={isGenerating || (questionType === "Hybrid" && hybridTotal === 0)} 
-                     className="gradient-primary text-primary-foreground font-semibold w-full h-12 text-sm rounded-xl shadow-lg shadow-indigo-500/20"
-                   >
-                     {isGenerating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin"/> Generating {questionType} Scenarios...</> : <><Sparkles className="w-4 h-4 mr-2"/> Generate Test ({numQuestions} Questions)</>}
-                   </Button>
+                   {isGenerating ? (
+                     <div className="w-full relative overflow-hidden rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 shadow-lg shadow-primary/10">
+                       <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 animate-shimmer" />
+                       <div className="relative z-10 flex flex-col items-center text-center gap-3">
+                         <div className="flex items-center gap-2 mb-1">
+                           <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                           <h3 className="text-[13px] font-bold text-foreground uppercase tracking-wider">Neural Synthesis Active</h3>
+                         </div>
+                         <div className="w-full h-2 rounded-full bg-background border border-border/40 overflow-hidden relative">
+                           <div 
+                             className="h-full bg-gradient-to-r from-indigo-500 to-primary transition-all duration-1000 ease-in-out rounded-full" 
+                             style={{ width: `${LOADING_PHASES[loadingPhase]?.progress || 100}%` }}
+                           />
+                         </div>
+                         <p className="text-xs font-mono text-muted-foreground animate-pulse">
+                           {LOADING_PHASES[loadingPhase]?.text || "Processing..."}
+                         </p>
+                       </div>
+                     </div>
+                   ) : (
+                     <Button 
+                       onClick={handleGenerateTest} 
+                       disabled={questionType === "Hybrid" && hybridTotal === 0} 
+                       className="gradient-primary text-primary-foreground font-semibold w-full h-12 text-sm rounded-xl shadow-lg shadow-indigo-500/20 hover:scale-[1.02] transition-transform"
+                     >
+                       <Sparkles className="w-4 h-4 mr-2"/> Generate Test ({numQuestions} Questions)
+                     </Button>
+                   )}
                  </div>
                </div>
             </div>
