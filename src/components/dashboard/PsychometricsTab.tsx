@@ -149,6 +149,11 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
         }
         await assessmentApi.generate(payload);
         toast({ title: "Assessment Generated", description: `${numQuestions} ${questionType} questions created successfully.` });
+        
+        // UX Enhancement: Fast-forward loader to 100% if AI was super fast, hold for 1s
+        setLoadingPhase(5); // 5 is the index for "Final polishing... Almost done!"
+        await new Promise(r => setTimeout(r, 1200));
+
         setShowConfig(false);
         setIsGenerating(false);
         await loadData();
