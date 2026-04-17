@@ -39,26 +39,40 @@ export async function apiFetch<T = unknown>(
     }
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers,
-  });
+  // 180s timeout — AI generation can take up to 2 mins for complex prompts
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 180_000);
 
-  if (!response.ok) {
-    let detail = `HTTP ${response.status}`;
-    try {
-      const err = await response.json();
-      detail = err.detail || JSON.stringify(err);
-    } catch {
-      /* ignore */
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      let detail = `HTTP ${response.status}`;
+      try {
+        const err = await response.json();
+        detail = err.detail || JSON.stringify(err);
+      } catch {
+        /* ignore */
+      }
+      throw new Error(detail);
     }
-    throw new Error(detail);
+
+    // 204 No Content — nothing to parse
+    if (response.status === 204) return undefined as T;
+
+    return response.json();
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error('Request timed out. The AI is taking too long — please try again.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  // 204 No Content — nothing to parse
-  if (response.status === 204) return undefined as T;
-
-  return response.json();
 }
 
 // ── Positions ──────────────────────────────────────────────────────────────

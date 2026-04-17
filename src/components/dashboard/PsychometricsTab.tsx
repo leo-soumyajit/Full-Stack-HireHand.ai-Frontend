@@ -112,25 +112,38 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
 
   const handleGenerateTest = async () => {
     setIsGenerating(true);
-    try {
-      const payload: any = {
-        position_id: position.id,
-        time_limit_minutes: timeLimit,
-        num_questions: numQuestions,
-        question_type: questionType,
-      };
-      if (questionType === "Hybrid") {
-        payload.distribution = hybridDist;
+    const maxRetries = 2;
+    let lastError = '';
+
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        const payload: any = {
+          position_id: position.id,
+          time_limit_minutes: timeLimit,
+          num_questions: numQuestions,
+          question_type: questionType,
+        };
+        if (questionType === "Hybrid") {
+          payload.distribution = hybridDist;
+        }
+        await assessmentApi.generate(payload);
+        toast({ title: "Assessment Generated", description: `${numQuestions} ${questionType} questions created successfully.` });
+        setShowConfig(false);
+        await loadData();
+        return; // Success — exit
+      } catch (err: any) {
+        lastError = err.message || String(err);
+        if (attempt <= maxRetries) {
+          console.warn(`[Assessment] Attempt ${attempt} failed, retrying... (${lastError})`);
+          toast({ title: `Attempt ${attempt} failed — retrying...`, description: "AI is being slow. Trying again automatically.", variant: "destructive" });
+          await new Promise(r => setTimeout(r, 2000 * attempt)); // 2s, 4s backoff
+        }
       }
-      await assessmentApi.generate(payload);
-      toast({ title: "Assessment Generated", description: `${numQuestions} ${questionType} questions created successfully.` });
-      setShowConfig(false);
-      await loadData();
-    } catch (err: any) {
-      toast({ title: "Failed to generate test", description: err.message || String(err), variant: "destructive" });
-    } finally {
-      setIsGenerating(false);
     }
+
+    // All retries exhausted
+    toast({ title: "Failed to generate test", description: lastError, variant: "destructive" });
+    setIsGenerating(false);
   };
 
   const handleClearAll = async () => {
