@@ -496,6 +496,7 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
                    </Button>
                  </div>
                </div>
+               )}
             </div>
           )}
 
