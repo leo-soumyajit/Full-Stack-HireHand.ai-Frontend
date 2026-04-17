@@ -150,6 +150,7 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
         await assessmentApi.generate(payload);
         toast({ title: "Assessment Generated", description: `${numQuestions} ${questionType} questions created successfully.` });
         setShowConfig(false);
+        setIsGenerating(false);
         await loadData();
         return; // Success — exit
       } catch (err: any) {
@@ -314,7 +315,36 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
           {/* ── PRO GENERATION SETTINGS ─────────────────────────────────────── */}
           {hasJD && !test && showConfig && (
             <div className="p-6 max-w-2xl mx-auto relative">
-               <div className="space-y-6">
+               {isGenerating ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="w-full max-w-md relative overflow-hidden rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-8 shadow-2xl shadow-indigo-500/20 backdrop-blur-sm">
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/0 via-primary/10 to-primary/0 animate-shimmer" />
+                      <div className="relative z-10 flex flex-col items-center gap-6">
+                        <div className="w-16 h-16 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                          <Brain className="w-8 h-8 text-indigo-400 animate-pulse" />
+                        </div>
+                        <div className="flex flex-col items-center gap-1.5">
+                          <h3 className="text-xl font-bold font-display uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-primary">
+                            Neural Synthesis Active
+                          </h3>
+                          <p className="text-[13px] font-medium text-muted-foreground">Constructing AI-driven scenario assessment</p>
+                        </div>
+                        <div className="w-full space-y-3 mt-4">
+                          <div className="w-full h-2.5 rounded-full bg-background border border-border/50 overflow-hidden relative">
+                            <div 
+                              className="h-full bg-gradient-to-r from-indigo-500 via-primary to-emerald-400 transition-all duration-1000 ease-in-out rounded-full" 
+                              style={{ width: `${LOADING_PHASES[loadingPhase]?.progress || 100}%` }}
+                            />
+                          </div>
+                          <p className="text-xs font-mono text-indigo-300/80 animate-pulse">
+                            {LOADING_PHASES[loadingPhase]?.text || "Processing..."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+               ) : (
+                 <div className="space-y-6">
                  <div className="flex justify-between items-center">
                     <div>
                       <h4 className="font-bold text-foreground text-lg font-display">Generation Settings</h4>
@@ -457,34 +487,13 @@ export function PsychometricsTab({ position, fitmentReports, onOpenScoring, onVi
                      </Badge>
                    </div>
 
-                   {isGenerating ? (
-                     <div className="w-full relative overflow-hidden rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 shadow-lg shadow-primary/10">
-                       <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 animate-shimmer" />
-                       <div className="relative z-10 flex flex-col items-center text-center gap-3">
-                         <div className="flex items-center gap-2 mb-1">
-                           <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
-                           <h3 className="text-[13px] font-bold text-foreground uppercase tracking-wider">Neural Synthesis Active</h3>
-                         </div>
-                         <div className="w-full h-2 rounded-full bg-background border border-border/40 overflow-hidden relative">
-                           <div 
-                             className="h-full bg-gradient-to-r from-indigo-500 to-primary transition-all duration-1000 ease-in-out rounded-full" 
-                             style={{ width: `${LOADING_PHASES[loadingPhase]?.progress || 100}%` }}
-                           />
-                         </div>
-                         <p className="text-xs font-mono text-muted-foreground animate-pulse">
-                           {LOADING_PHASES[loadingPhase]?.text || "Processing..."}
-                         </p>
-                       </div>
-                     </div>
-                   ) : (
-                     <Button 
-                       onClick={handleGenerateTest} 
-                       disabled={questionType === "Hybrid" && hybridTotal === 0} 
-                       className="gradient-primary text-primary-foreground font-semibold w-full h-12 text-sm rounded-xl shadow-lg shadow-indigo-500/20 hover:scale-[1.02] transition-transform"
-                     >
-                       <Sparkles className="w-4 h-4 mr-2"/> Generate Test ({numQuestions} Questions)
-                     </Button>
-                   )}
+                   <Button 
+                     onClick={handleGenerateTest} 
+                     disabled={questionType === "Hybrid" && hybridTotal === 0} 
+                     className="gradient-primary text-primary-foreground font-semibold w-full h-12 text-sm rounded-xl shadow-lg shadow-indigo-500/20 hover:scale-[1.02] transition-transform"
+                   >
+                     <Sparkles className="w-4 h-4 mr-2"/> Generate Test ({numQuestions} Questions)
+                   </Button>
                  </div>
                </div>
             </div>
