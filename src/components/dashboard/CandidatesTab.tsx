@@ -66,6 +66,7 @@ import { psychometricApi } from "@/lib/psychometricApi";
 import { generateFitmentPDF } from "@/lib/generateFitmentPDF";
 import { emailApi } from "@/lib/emailApi";
 import { assessmentApi, candidatesApi } from "@/lib/api";
+import { useRoleAccess } from "@/hooks/useRoleAccess";
 
 const STAGES = ["Sourced", "Screened", "Interview L1", "Interview L2", "Offer", "Rejected"];
 
@@ -133,6 +134,7 @@ export function CandidatesTab({
   const [isSendingMail, setIsSendingMail] = useState<string | false>(false);
   const [dispatchingStatus, setDispatchingStatus] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
+  const { canManageCandidates, canScreenResumes, canSendAssessment, canManageSchedules, canScorePsychometrics } = useRoleAccess();
 
   const displayCandidates = useMemo(() => {
     if (!candidates.length) return [];
@@ -368,31 +370,41 @@ export function CandidatesTab({
               <DropdownMenuItem onClick={() => onViewReport?.(c.id, c.name)} className="gap-2 cursor-pointer">
                 <FileBarChart className="h-4 w-4 text-emerald-400" /><span>View Fitment Report</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSchedulingModalOpen({ candidateId: c.id, candidateName: c.name })} className="gap-2 cursor-pointer">
-                <CalendarIcon className="h-4 w-4 text-indigo-400" /><span>Schedule Interview</span>
-              </DropdownMenuItem>
+              {canManageSchedules && (
+                <DropdownMenuItem onClick={() => setSchedulingModalOpen({ candidateId: c.id, candidateName: c.name })} className="gap-2 cursor-pointer">
+                  <CalendarIcon className="h-4 w-4 text-indigo-400" /><span>Schedule Interview</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => handleDownloadPDF(c.id, c.name)} disabled={downloadingPDF === c.id} className="gap-2 cursor-pointer">
                 {downloadingPDF === c.id ? <Loader2 className="h-4 w-4 animate-spin text-blue-400" /> : <Download className="h-4 w-4 text-blue-400" />}
                 <span>{downloadingPDF === c.id ? "Generating PDF..." : "Download PDF Report"}</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border/40" />
-              <DropdownMenuItem onClick={() => handleDispatchAssessment(c.id)} disabled={dispatchingStatus[c.id] || isManuallyRejected} className="gap-2 cursor-pointer">
-                {dispatchingStatus[c.id] ? <Loader2 className="h-4 w-4 animate-spin text-purple-400" /> : <Send className="h-4 w-4 text-purple-400" />}
-                <span>{dispatchingStatus[c.id] ? "Dispatching..." : "Dispatch Assessment"}</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border/40" />
-              {!isManuallyRejected ? (
-                <DropdownMenuItem onClick={() => handleReject(c.id)} className="text-orange-400 focus:text-orange-400 focus:bg-orange-500/10 gap-2 cursor-pointer">
-                  <UserMinus className="h-4 w-4" /><span>Reject Candidate</span>
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem onClick={() => handleRevert(c.id)} className="text-emerald-400 focus:text-emerald-400 focus:bg-emerald-500/10 gap-2 cursor-pointer">
-                  <RotateCcw className="h-4 w-4" /><span>Undo Rejection</span>
-                </DropdownMenuItem>
+              {canSendAssessment && (
+                <>
+                  <DropdownMenuSeparator className="bg-border/40" />
+                  <DropdownMenuItem onClick={() => handleDispatchAssessment(c.id)} disabled={dispatchingStatus[c.id] || isManuallyRejected} className="gap-2 cursor-pointer">
+                    {dispatchingStatus[c.id] ? <Loader2 className="h-4 w-4 animate-spin text-purple-400" /> : <Send className="h-4 w-4 text-purple-400" />}
+                    <span>{dispatchingStatus[c.id] ? "Dispatching..." : "Dispatch Assessment"}</span>
+                  </DropdownMenuItem>
+                </>
               )}
-              <DropdownMenuItem onClick={() => setDeleteCandidateId(c.id)} className="text-red-400 focus:text-red-400 focus:bg-red-500/10 gap-2 cursor-pointer">
-                <Trash2 className="h-4 w-4" /><span>Remove</span>
-              </DropdownMenuItem>
+              {canManageCandidates && (
+                <>
+                  <DropdownMenuSeparator className="bg-border/40" />
+                  {!isManuallyRejected ? (
+                    <DropdownMenuItem onClick={() => handleReject(c.id)} className="text-orange-400 focus:text-orange-400 focus:bg-orange-500/10 gap-2 cursor-pointer">
+                      <UserMinus className="h-4 w-4" /><span>Reject Candidate</span>
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={() => handleRevert(c.id)} className="text-emerald-400 focus:text-emerald-400 focus:bg-emerald-500/10 gap-2 cursor-pointer">
+                      <RotateCcw className="h-4 w-4" /><span>Undo Rejection</span>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => setDeleteCandidateId(c.id)} className="text-red-400 focus:text-red-400 focus:bg-red-500/10 gap-2 cursor-pointer">
+                    <Trash2 className="h-4 w-4" /><span>Remove</span>
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
@@ -419,16 +431,20 @@ export function CandidatesTab({
             <p className="text-lg font-semibold text-foreground font-display">No Candidates Yet</p>
             <p className="text-sm text-muted-foreground mt-1 mb-5">Screen resumes with AI or add manually.</p>
             <div className="flex items-center justify-center gap-3 flex-wrap">
-              <Button
-                onClick={() => setScreenResumeOpen(true)}
-                variant="outline"
-                className="border-primary/40 text-primary hover:bg-primary/10 font-semibold"
-              >
-                <ScanSearch className="h-4 w-4 mr-1.5" /> Screen Resume with AI
-              </Button>
-              <Button onClick={() => setModalOpen(true)} className="gradient-primary text-primary-foreground font-semibold">
-                <UserPlus className="h-4 w-4 mr-1" /> Add Candidate
-              </Button>
+              {canScreenResumes && (
+                <Button
+                  onClick={() => setScreenResumeOpen(true)}
+                  variant="outline"
+                  className="border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+                >
+                  <ScanSearch className="h-4 w-4 mr-1.5" /> Screen Resume with AI
+                </Button>
+              )}
+              {canManageCandidates && (
+                <Button onClick={() => setModalOpen(true)} className="gradient-primary text-primary-foreground font-semibold">
+                  <UserPlus className="h-4 w-4 mr-1" /> Add Candidate
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -474,17 +490,21 @@ export function CandidatesTab({
               />
             </div>
             
-            <Button
-              onClick={() => setScreenResumeOpen(true)}
-              size="sm"
-              variant="outline"
-              className="border-primary/40 text-primary hover:bg-primary/10 font-semibold"
-            >
-              <ScanSearch className="h-4 w-4 mr-1.5" /> Screen Resume with AI
-            </Button>
-            <Button onClick={() => setModalOpen(true)} size="sm" className="gradient-primary text-primary-foreground font-semibold">
-              <UserPlus className="h-4 w-4 mr-1" /> Add Candidate
-            </Button>
+            {canScreenResumes && (
+              <Button
+                onClick={() => setScreenResumeOpen(true)}
+                size="sm"
+                variant="outline"
+                className="border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+              >
+                <ScanSearch className="h-4 w-4 mr-1.5" /> Screen Resume with AI
+              </Button>
+            )}
+            {canManageCandidates && (
+              <Button onClick={() => setModalOpen(true)} size="sm" className="gradient-primary text-primary-foreground font-semibold">
+                <UserPlus className="h-4 w-4 mr-1" /> Add Candidate
+              </Button>
+            )}
           </div>
         </div>
 
@@ -495,16 +515,18 @@ export function CandidatesTab({
                 <Sparkles className="h-5 w-5 text-emerald-500" />
                 Shortlisted Candidates ({shortlistedList.length})
               </h3>
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                className="font-semibold gap-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                disabled={isSendingMail === 'shortlist'}
-                onClick={() => handleSendBulkMail('shortlist')}
-              >
-                {isSendingMail === 'shortlist' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Send Shortlist Mail
-              </Button>
+              {canManageCandidates && (
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  className="font-semibold gap-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
+                  disabled={isSendingMail === 'shortlist'}
+                  onClick={() => handleSendBulkMail('shortlist')}
+                >
+                  {isSendingMail === 'shortlist' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  Send Shortlist Mail
+                </Button>
+              )}
             </div>
             <Card className="glass-card overflow-hidden">
               <Table>
@@ -534,16 +556,18 @@ export function CandidatesTab({
                 <Trash2 className="h-5 w-5 text-red-500" />
                 Unselected / Rejected ({rejectedList.length})
               </h3>
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                className="font-semibold gap-1.5 bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                disabled={isSendingMail === 'reject'}
-                onClick={() => handleSendBulkMail('reject')}
-              >
-                {isSendingMail === 'reject' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Send Rejection Mail
-              </Button>
+              {canManageCandidates && (
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  className="font-semibold gap-1.5 bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                  disabled={isSendingMail === 'reject'}
+                  onClick={() => handleSendBulkMail('reject')}
+                >
+                  {isSendingMail === 'reject' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  Send Rejection Mail
+                </Button>
+              )}
             </div>
             <Card className="glass-card overflow-hidden opacity-90">
               <Table>

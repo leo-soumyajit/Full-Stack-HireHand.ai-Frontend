@@ -88,7 +88,8 @@ export function DashboardSidebar({
         )}
       </div>
 
-      {/* Primary CTA */}
+      {/* Primary CTA — only for Manager+ */}
+      {hasMinRole(userRole, 'manager') && (
       <div className="px-3 mt-2">
         <button
           onClick={() => {
@@ -104,6 +105,7 @@ export function DashboardSidebar({
           {!isCollapsed && <span>✨ Paste Job Description</span>}
         </button>
       </div>
+      )}
 
       {/* Main Nav */}
       <nav className="flex-1 p-3 mt-4 space-y-1 overflow-y-auto">

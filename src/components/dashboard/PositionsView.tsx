@@ -48,6 +48,7 @@ import { usePositions } from "@/hooks/usePositions";
 import { ApiPosition } from "@/types/api";
 import { enhanceJDWithAI } from "@/lib/openrouter";
 import { useToast } from "@/hooks/use-toast";
+import { useRoleAccess } from "@/hooks/useRoleAccess";
 
 type ModalStep = "form" | "success";
 type ModalMode = "create" | "edit";
@@ -87,6 +88,7 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
   const [isGeneratingJD, setIsGeneratingJD] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const { canCreatePosition, canEditPosition, canDeletePosition } = useRoleAccess();
 
   const filteredPositions = useMemo(() => {
     let filtered = positions.filter((p) => p.status === statusFilter);
@@ -217,9 +219,11 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
               {positions.length} total · {openCount} open · {totalCandidates} candidates
             </p>
           </div>
-          <Button onClick={openCreateModal} className="gradient-primary text-primary-foreground font-semibold rounded-xl hover:opacity-90 gap-2 shadow-lg shadow-primary/20">
-            <Plus className="h-4 w-4" /> New Position
-          </Button>
+          {canCreatePosition && (
+            <Button onClick={openCreateModal} className="gradient-primary text-primary-foreground font-semibold rounded-xl hover:opacity-90 gap-2 shadow-lg shadow-primary/20">
+              <Plus className="h-4 w-4" /> New Position
+            </Button>
+          )}
         </motion.div>
 
         {/* Filter Bar */}
@@ -323,19 +327,25 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewPosition(pos.id); }}>
                               <Eye className="h-4 w-4 mr-2" /> View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => openEditModal(pos, e)}>
-                              <Pencil className="h-4 w-4 mr-2" /> Edit Position
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => handleStatusToggle(pos.id, pos.status, e)}>
-                              {pos.status === "Active" ? (
-                                <><XCircle className="h-4 w-4 mr-2" /> Mark as Closed</>
-                              ) : (
-                                <><RotateCcw className="h-4 w-4 mr-2" /> Re-open Position</>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => handleDelete(pos.id, e)} className="text-red-400 focus:text-red-400 focus:bg-red-500/10">
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete Position
-                            </DropdownMenuItem>
+                            {canEditPosition && (
+                              <DropdownMenuItem onClick={(e) => openEditModal(pos, e)}>
+                                <Pencil className="h-4 w-4 mr-2" /> Edit Position
+                              </DropdownMenuItem>
+                            )}
+                            {canEditPosition && (
+                              <DropdownMenuItem onClick={(e) => handleStatusToggle(pos.id, pos.status, e)}>
+                                {pos.status === "Active" ? (
+                                  <><XCircle className="h-4 w-4 mr-2" /> Mark as Closed</>
+                                ) : (
+                                  <><RotateCcw className="h-4 w-4 mr-2" /> Re-open Position</>
+                                )}
+                              </DropdownMenuItem>
+                            )}
+                            {canDeletePosition && (
+                              <DropdownMenuItem onClick={(e) => handleDelete(pos.id, e)} className="text-red-400 focus:text-red-400 focus:bg-red-500/10">
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete Position
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -349,7 +359,7 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
                         ) : (
                           <>
                             No {statusFilter === "Active" ? "open" : "closed"} positions.{" "}
-                            {statusFilter === "Active" && (
+                            {statusFilter === "Active" && canCreatePosition && (
                               <button onClick={openCreateModal} className="text-primary hover:underline">Create your first one →</button>
                             )}
                           </>

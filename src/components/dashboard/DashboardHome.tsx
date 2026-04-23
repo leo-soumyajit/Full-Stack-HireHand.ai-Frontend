@@ -16,6 +16,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { usePositions } from "@/hooks/usePositions";
+import { useRoleAccess } from "@/hooks/useRoleAccess";
 
 const container = {
   hidden: { opacity: 0 },
@@ -34,6 +35,7 @@ interface DashboardHomeProps {
 
 export function DashboardHome({ onViewPosition, onNavigate, onPasteJD }: DashboardHomeProps) {
   const { positions, isLoading } = usePositions();
+  const { canUseAITools, canCreatePosition } = useRoleAccess();
 
   const openCount = useMemo(() => positions.filter((p) => p.status === "Active").length, [positions]);
   const closedCount = useMemo(() => positions.filter((p) => p.status === "Closed").length, [positions]);
@@ -94,7 +96,7 @@ export function DashboardHome({ onViewPosition, onNavigate, onPasteJD }: Dashboa
         <h2 className="text-lg font-semibold text-foreground mb-3 font-display">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: "Paste Job Description", icon: Sparkles, desc: "Create positions with AI", action: onPasteJD, gradient: true },
+            ...(canUseAITools ? [{ label: "Paste Job Description", icon: Sparkles, desc: "Create positions with AI", action: onPasteJD, gradient: true }] : []),
             { label: "View All Positions", icon: Briefcase, desc: `${openCount} open roles`, action: () => onNavigate?.("positions") },
             { label: "All Candidates", icon: Users, desc: `${totalCandidates} in pipeline`, action: () => onNavigate?.("candidates") },
           ].map((qa) => (
@@ -136,9 +138,11 @@ export function DashboardHome({ onViewPosition, onNavigate, onPasteJD }: Dashboa
           <Card className="glass-card p-8 text-center">
             <Briefcase className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">No positions created yet.</p>
-            <button onClick={onPasteJD} className="text-sm text-primary hover:underline mt-2 inline-flex items-center gap-1">
-              <Sparkles className="h-3 w-3" /> Create your first position
-            </button>
+            {canCreatePosition && (
+              <button onClick={onPasteJD} className="text-sm text-primary hover:underline mt-2 inline-flex items-center gap-1">
+                <Sparkles className="h-3 w-3" /> Create your first position
+              </button>
+            )}
           </Card>
         ) : (
           <div className="space-y-2">
