@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore, hasMinRole } from "@/store/authStore";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 
 const mainNav = [
@@ -35,6 +35,7 @@ const mainNav = [
 
 const adminNav = [
   { icon: User, label: "Profile & Settings", action: "profile" },
+  { icon: Users, label: "Team Members", action: "team", minRole: "admin" as const },
   { icon: Settings, label: "Config", action: "config" },
   { icon: Shield, label: "Audit & Governance", action: "audit" },
   { icon: KeyRound, label: "Change Password", action: "password" },
@@ -61,6 +62,8 @@ export function DashboardSidebar({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const logout = useAuthStore((state) => state.logout);
+  const currentUser = useAuthStore((state) => state.user);
+  const userRole = currentUser?.role || "owner";
 
   const handleLogout = () => {
     logout();
@@ -134,7 +137,7 @@ export function DashboardSidebar({
           <p className={cn("text-[10px] uppercase tracking-widest text-muted-foreground mb-2", isCollapsed && "sr-only")}>
             Admin
           </p>
-          {adminNav.map((item) => {
+          {adminNav.filter((item) => !(item as any).minRole || hasMinRole(userRole, (item as any).minRole)).map((item) => {
             const isActive = activeSection === item.action;
             return (
             <button
@@ -144,6 +147,8 @@ export function DashboardSidebar({
                   setPasswordModalOpen(true);
                 } else if (item.action === "profile") {
                   onSectionChange?.("profile");
+                } else if (item.action === "team") {
+                  onSectionChange?.("team");
                 }
                 if (isMobile) setMobileOpen(false);
               }}

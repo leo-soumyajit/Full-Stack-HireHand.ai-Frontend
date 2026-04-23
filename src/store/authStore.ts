@@ -14,6 +14,25 @@ export interface User {
   bio?: string | null;
   avatar_url?: string | null;
   cover_url?: string | null;
+  // RBAC
+  role?: string;
+  org_id?: string | null;
+}
+
+// ── RBAC Helpers ──
+export type UserRole = 'owner' | 'admin' | 'manager' | 'interviewer' | 'viewer';
+
+const ROLE_HIERARCHY: Record<string, number> = {
+  owner: 5,
+  admin: 4,
+  manager: 3,
+  interviewer: 2,
+  viewer: 1,
+};
+
+/** Check if a user's role meets or exceeds the minimum required role */
+export function hasMinRole(userRole: string | undefined, minRole: UserRole): boolean {
+  return (ROLE_HIERARCHY[userRole || 'owner'] ?? 5) >= (ROLE_HIERARCHY[minRole] ?? 99);
 }
 
 interface AuthState {

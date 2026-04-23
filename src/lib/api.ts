@@ -191,3 +191,30 @@ export const assessmentApi = {
       body: JSON.stringify(body),
     }),
 };
+
+// ── Team Management ────────────────────────────────────────────────────
+
+export const teamApi = {
+  listRoles: () =>
+    apiFetch<{ role: string; level: number; description: string; permissions: string[] }[]>('/api/team/roles'),
+
+  listMembers: () =>
+    apiFetch<{ id: string; name: string; email: string; role: string; is_verified: boolean; created_at?: string; avatar_url?: string }[]>('/api/team/members'),
+
+  createMember: (body: { name: string; email: string; role: string }) =>
+    apiFetch<{ id: string; name: string; email: string; role: string }>('/api/team/members', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateRole: (memberId: string, role: string) =>
+    apiFetch<{ id: string; name: string; email: string; role: string }>(`/api/team/members/${memberId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+
+  deleteMember: (memberId: string) =>
+    apiFetch<{ message: string }>(`/api/team/members/${memberId}`, {
+      method: 'DELETE',
+    }),
+};

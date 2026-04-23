@@ -10,6 +10,7 @@ import { AllCandidatesView } from "@/components/dashboard/AllCandidatesView";
 import { JDInput } from "@/components/dashboard/JDInput";
 import { LoadingState } from "@/components/dashboard/LoadingState";
 import { CompanyProfile } from "@/components/dashboard/CompanyProfile";
+import { TeamManagement } from "@/components/dashboard/TeamManagement";
 import { QuestionList } from "@/components/dashboard/QuestionList";
 import { SchedulingTab } from "@/components/dashboard/SchedulingTab";
 import { Question } from "@/types/questions";
@@ -26,7 +27,8 @@ type DashboardView =
   | "loading"
   | "results"
   | "scheduling"
-  | "profile";
+  | "profile"
+  | "team";
 
 const Dashboard = () => {
   const { toast } = useToast();
@@ -111,6 +113,7 @@ const Dashboard = () => {
       else if (section === "candidates") prev.set("v", "candidates");
       else if (section === "scheduling") prev.set("v", "scheduling");
       else if (section === "profile") prev.set("v", "profile");
+      else if (section === "team") prev.set("v", "team");
       
       return prev;
     });
@@ -157,6 +160,9 @@ const Dashboard = () => {
             )}
             {view === "profile" && (
               <CompanyProfile key="profile" />
+            )}
+            {view === "team" && (
+              <TeamManagement key="team" />
             )}
             {view === "input" && (
               <JDInput key="input" onGenerate={handleGenerate} isGenerating={false} />
