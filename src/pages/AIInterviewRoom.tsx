@@ -178,7 +178,7 @@ export default function AIInterviewRoom() {
   // Buffer final transcripts and wait for silence before sending full answer
   const speechBufferRef = useRef<string[]>([]);
   const silenceTimerRef = useRef<number | null>(null);
-  const SILENCE_DELAY_MS = 3500; // Wait 3.5s of silence before sending answer
+  const SILENCE_DELAY_MS = 4000; // Wait 4.0s of silence before sending answer
 
   const flushSpeechBuffer = useCallback(() => {
     const fullAnswer = speechBufferRef.current.join(" ").trim();
