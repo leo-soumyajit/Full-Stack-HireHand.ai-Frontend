@@ -224,8 +224,6 @@ export default function AIInterviewRoom() {
     },
     [sendCandidateSpeech, sendInterimSpeech, flushSpeechBuffer]
   );
-    [sendCandidateSpeech, sendInterimSpeech, flushSpeechBuffer]
-  );
 
   const deepgram = useDeepgram(onTranscript);
 
