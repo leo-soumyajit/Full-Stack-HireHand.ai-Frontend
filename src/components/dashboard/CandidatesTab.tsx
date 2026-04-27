@@ -19,6 +19,9 @@ import {
   UserMinus,
   RotateCcw,
   Bot,
+  Mic,
+  Clock,
+  Volume2,
 } from "lucide-react";
 import { ResumeScreeningModal } from "./ResumeScreeningModal";
 import { SchedulingModal } from "./SchedulingModal";
@@ -27,6 +30,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { MainLoader } from "@/components/ui/main-loader";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -136,6 +147,14 @@ export function CandidatesTab({
   const [isSendingMail, setIsSendingMail] = useState<string | false>(false);
   const [dispatchingStatus, setDispatchingStatus] = useState<Record<string, boolean>>({});
   const [aiDispatchingStatus, setAiDispatchingStatus] = useState<Record<string, boolean>>({});
+  const [aiConfigModal, setAiConfigModal] = useState<{ candidateId: string; candidateName: string } | null>(null);
+  const [aiConfig, setAiConfig] = useState({
+    interview_type: "hybrid",
+    custom_type: "",
+    voice: "asteria",
+    time_limit_minutes: 20,
+    max_questions: 10,
+  });
   const { toast } = useToast();
   const { canManageCandidates, canScreenResumes, canSendAssessment, canManageSchedules, canScorePsychometrics } = useRoleAccess();
 
@@ -311,12 +330,25 @@ export function CandidatesTab({
   };
 
   // ── AI Interview Dispatch ────────────────────────────────────────
-  const handleDispatchAIInterview = async (candidateId: string) => {
+  const openAiConfigModal = (candidateId: string, candidateName: string) => {
+    setAiConfig({ interview_type: "hybrid", custom_type: "", voice: "asteria", time_limit_minutes: 20, max_questions: 10 });
+    setAiConfigModal({ candidateId, candidateName });
+  };
+
+  const handleDispatchAIInterview = async () => {
+    if (!aiConfigModal) return;
+    const { candidateId } = aiConfigModal;
     setAiDispatchingStatus(prev => ({ ...prev, [candidateId]: true }));
+    setAiConfigModal(null);
     try {
+      const interviewType = aiConfig.interview_type === "custom" ? aiConfig.custom_type : aiConfig.interview_type;
       await aiInterviewApi.dispatch({
         candidate_id: candidateId,
         position_id: positionId,
+        interview_type: interviewType,
+        voice: aiConfig.voice,
+        time_limit_minutes: aiConfig.time_limit_minutes,
+        max_questions: aiConfig.max_questions,
       });
       toast({ title: "🤖 AI Interview Dispatched!", description: "Magic link sent to candidate. AI will conduct the interview automatically." });
       loadCandidates();
@@ -406,7 +438,7 @@ export function CandidatesTab({
                     {dispatchingStatus[c.id] ? <Loader2 className="h-4 w-4 animate-spin text-purple-400" /> : <Send className="h-4 w-4 text-purple-400" />}
                     <span>{dispatchingStatus[c.id] ? "Dispatching..." : "Dispatch Assessment"}</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleDispatchAIInterview(c.id)} disabled={aiDispatchingStatus[c.id] || isManuallyRejected} className="gap-2 cursor-pointer">
+                  <DropdownMenuItem onClick={() => openAiConfigModal(c.id, c.name)} disabled={aiDispatchingStatus[c.id] || isManuallyRejected} className="gap-2 cursor-pointer">
                     {aiDispatchingStatus[c.id] ? <Loader2 className="h-4 w-4 animate-spin text-cyan-400" /> : <Bot className="h-4 w-4 text-cyan-400" />}
                     <span>{aiDispatchingStatus[c.id] ? "Dispatching..." : "Dispatch AI Interview"}</span>
                   </DropdownMenuItem>
@@ -644,6 +676,128 @@ export function CandidatesTab({
           onScheduled={() => loadCandidates()}
         />
       )}
+      {/* ── AI Interview Config Modal ── */}
+      <Dialog open={!!aiConfigModal} onOpenChange={(open) => !open && setAiConfigModal(null)}>
+        <DialogContent className="bg-card border-border/40 max-w-lg shadow-2xl glass-strong">
+          <DialogHeader>
+            <DialogTitle className="text-foreground font-display flex items-center gap-2">
+              <Bot className="h-5 w-5 text-cyan-400" />
+              Configure AI Interview
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              {aiConfigModal && <>Set up the AI interview for <span className="text-foreground font-medium">{aiConfigModal.candidateName}</span></>}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {/* Interview Type */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                Interview Type
+              </Label>
+              <Select value={aiConfig.interview_type} onValueChange={(v) => setAiConfig(prev => ({ ...prev, interview_type: v }))}>
+                <SelectTrigger className="bg-muted/50 border-border/40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="technical">🔧 Technical</SelectItem>
+                  <SelectItem value="behavioral">🧠 Behavioral</SelectItem>
+                  <SelectItem value="managerial">👔 Managerial</SelectItem>
+                  <SelectItem value="culture_fit">🤝 Culture Fit</SelectItem>
+                  <SelectItem value="hybrid">⚡ Hybrid (Recommended)</SelectItem>
+                  <SelectItem value="custom">✏️ Custom...</SelectItem>
+                </SelectContent>
+              </Select>
+              {aiConfig.interview_type === "custom" && (
+                <Input
+                  placeholder="e.g., System Design, Product Sense, Leadership..."
+                  value={aiConfig.custom_type}
+                  onChange={(e) => setAiConfig(prev => ({ ...prev, custom_type: e.target.value }))}
+                  className="bg-muted/50 border-border/40 mt-1.5"
+                />
+              )}
+            </div>
+
+            {/* Voice Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Volume2 className="h-3.5 w-3.5 text-cyan-400" />
+                AI Voice
+              </Label>
+              <Select value={aiConfig.voice} onValueChange={(v) => setAiConfig(prev => ({ ...prev, voice: v }))}>
+                <SelectTrigger className="bg-muted/50 border-border/40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asteria">👩 Asteria — Professional Female</SelectItem>
+                  <SelectItem value="luna">👩 Luna — Warm Female</SelectItem>
+                  <SelectItem value="stella">👩 Stella — Clear Female</SelectItem>
+                  <SelectItem value="orion">👨 Orion — Professional Male</SelectItem>
+                  <SelectItem value="arcas">👨 Arcas — Warm Male</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Time Limit */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-cyan-400" />
+                Time Limit: <span className="text-cyan-400">{aiConfig.time_limit_minutes} min</span>
+              </Label>
+              <input
+                type="range"
+                min={5}
+                max={45}
+                step={5}
+                value={aiConfig.time_limit_minutes}
+                onChange={(e) => setAiConfig(prev => ({ ...prev, time_limit_minutes: Number(e.target.value) }))}
+                className="w-full accent-cyan-500 cursor-pointer"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>5 min</span>
+                <span>45 min</span>
+              </div>
+            </div>
+
+            {/* Max Questions */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Mic className="h-3.5 w-3.5 text-cyan-400" />
+                Max Questions: <span className="text-cyan-400">{aiConfig.max_questions}</span>
+              </Label>
+              <input
+                type="range"
+                min={3}
+                max={20}
+                step={1}
+                value={aiConfig.max_questions}
+                onChange={(e) => setAiConfig(prev => ({ ...prev, max_questions: Number(e.target.value) }))}
+                className="w-full accent-cyan-500 cursor-pointer"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>3 Qs</span>
+                <span>20 Qs</span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-2">
+            <Button variant="ghost" onClick={() => setAiConfigModal(null)} className="border-border/40">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDispatchAIInterview}
+              disabled={aiConfig.interview_type === "custom" && !aiConfig.custom_type.trim()}
+              className="bg-gradient-to-r from-cyan-500 to-indigo-500 text-white font-semibold rounded-lg hover:opacity-90 gap-1.5"
+            >
+              <Bot className="h-4 w-4" />
+              Dispatch AI Interview
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={!!deleteCandidateId} onOpenChange={(open) => !open && setDeleteCandidateId(null)}>
         <AlertDialogContent className="bg-card border-border/40 max-w-md shadow-2xl glass-strong">
           <AlertDialogHeader>
