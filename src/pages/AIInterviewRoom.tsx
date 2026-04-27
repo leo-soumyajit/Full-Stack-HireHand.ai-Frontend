@@ -178,7 +178,7 @@ export default function AIInterviewRoom() {
   // Buffer final transcripts and wait for silence before sending full answer
   const speechBufferRef = useRef<string[]>([]);
   const silenceTimerRef = useRef<number | null>(null);
-  const SILENCE_DELAY_MS = 2500; // Wait 2.5s of silence before sending answer
+  const SILENCE_DELAY_MS = 3500; // Wait 3.5s of silence before sending answer
 
   const flushSpeechBuffer = useCallback(() => {
     const fullAnswer = speechBufferRef.current.join(" ").trim();
@@ -190,16 +190,24 @@ export default function AIInterviewRoom() {
 
   const onTranscript = useCallback(
     (text: string, isFinal: boolean) => {
+      // 1. Handle the text
       if (isFinal && text.trim()) {
-        // Deduplicate
+        // Deduplicate exactly identical consecutive final texts (rare but possible)
         if (text.trim() === lastFinalRef.current) return;
         lastFinalRef.current = text.trim();
 
         // Add to buffer
         speechBufferRef.current.push(text.trim());
         setInterimText("");
+      } else if (text.trim()) {
+        // Show interim text (what candidate is currently saying)
+        const bufferedSoFar = speechBufferRef.current.join(" ");
+        setInterimText(bufferedSoFar ? `${bufferedSoFar} ${text}` : text);
+        sendInterimSpeech(text);
+      }
 
-        // Reset silence timer — wait for candidate to finish speaking
+      // 2. Restart the silence timer on ANY speech (final or interim)
+      if (text.trim()) {
         if (silenceTimerRef.current) {
           clearTimeout(silenceTimerRef.current);
         }
@@ -207,13 +215,10 @@ export default function AIInterviewRoom() {
           flushSpeechBuffer();
           silenceTimerRef.current = null;
         }, SILENCE_DELAY_MS);
-      } else if (text.trim()) {
-        // Show interim text (what candidate is currently saying)
-        const bufferedSoFar = speechBufferRef.current.join(" ");
-        setInterimText(bufferedSoFar ? `${bufferedSoFar} ${text}` : text);
-        sendInterimSpeech(text);
       }
     },
+    [sendCandidateSpeech, sendInterimSpeech, flushSpeechBuffer]
+  );
     [sendCandidateSpeech, sendInterimSpeech, flushSpeechBuffer]
   );
 
