@@ -37,12 +37,15 @@ function formatTime(seconds: number): string {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// AI ORB ANIMATION COMPONENT
+// AI ORB / AVATAR ANIMATION COMPONENT
 // ══════════════════════════════════════════════════════════════════════
-function AIOrb({ state }: { state: string }) {
+function AIOrb({ state, voice = "asteria" }: { state: string; voice?: string }) {
   const isSpeaking = state === "speaking";
   const isThinking = state === "thinking";
   const isListening = state === "listening";
+
+  const isMale = voice.includes("orion") || voice.includes("arcas");
+  const avatarSrc = isMale ? "/avatars/male-avatar.png" : "/avatars/female-avatar.png";
 
   return (
     <div className="ai-orb-container">
@@ -92,7 +95,9 @@ function AIOrb({ state }: { state: string }) {
           ease: "easeInOut",
         }}
       >
-        <Bot className="ai-orb-icon" />
+        <div className="w-full h-full rounded-full overflow-hidden border-2 border-indigo-500/50 bg-black">
+          <img src={avatarSrc} alt="AI Interviewer" className="w-full h-full object-cover" />
+        </div>
       </motion.div>
 
       {/* Status label */}
@@ -526,9 +531,9 @@ export default function AIInterviewRoom() {
 
         {/* ── Main Content ── */}
         <div className="ai-main-content">
-          {/* Left: AI Orb */}
+          {/* Left: AI Avatar */}
           <div className="ai-orb-section">
-            <AIOrb state={state} />
+            <AIOrb state={state} voice={config?.voice} />
           </div>
 
           {/* Right: Transcript + Video */}

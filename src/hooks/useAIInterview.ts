@@ -36,6 +36,7 @@ export interface AIInterviewConfig {
   round: number;
   interview_type: string;
   status: string;
+  voice: string;
 }
 
 export function useAIInterview(token: string) {
