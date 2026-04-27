@@ -175,6 +175,19 @@ export default function AIInterviewRoom() {
   const lastFinalRef = useRef<string>("");
 
   // ── Deepgram STT (reusing existing hook) ──
+  // Buffer final transcripts and wait for silence before sending full answer
+  const speechBufferRef = useRef<string[]>([]);
+  const silenceTimerRef = useRef<number | null>(null);
+  const SILENCE_DELAY_MS = 2500; // Wait 2.5s of silence before sending answer
+
+  const flushSpeechBuffer = useCallback(() => {
+    const fullAnswer = speechBufferRef.current.join(" ").trim();
+    if (fullAnswer.length > 0) {
+      sendCandidateSpeech(fullAnswer);
+    }
+    speechBufferRef.current = [];
+  }, [sendCandidateSpeech]);
+
   const onTranscript = useCallback(
     (text: string, isFinal: boolean) => {
       if (isFinal && text.trim()) {
@@ -182,14 +195,26 @@ export default function AIInterviewRoom() {
         if (text.trim() === lastFinalRef.current) return;
         lastFinalRef.current = text.trim();
 
+        // Add to buffer
+        speechBufferRef.current.push(text.trim());
         setInterimText("");
-        sendCandidateSpeech(text.trim());
-      } else {
-        setInterimText(text);
+
+        // Reset silence timer — wait for candidate to finish speaking
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+        }
+        silenceTimerRef.current = window.setTimeout(() => {
+          flushSpeechBuffer();
+          silenceTimerRef.current = null;
+        }, SILENCE_DELAY_MS);
+      } else if (text.trim()) {
+        // Show interim text (what candidate is currently saying)
+        const bufferedSoFar = speechBufferRef.current.join(" ");
+        setInterimText(bufferedSoFar ? `${bufferedSoFar} ${text}` : text);
         sendInterimSpeech(text);
       }
     },
-    [sendCandidateSpeech, sendInterimSpeech]
+    [sendCandidateSpeech, sendInterimSpeech, flushSpeechBuffer]
   );
 
   const deepgram = useDeepgram(onTranscript);
@@ -287,10 +312,16 @@ export default function AIInterviewRoom() {
 
   // ── End interview ──
   const handleEndInterview = useCallback(() => {
+    // Flush any remaining speech in the buffer before ending
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    flushSpeechBuffer();
     deepgram.stop();
     endInterview();
     setShowEndConfirm(false);
-  }, [deepgram, endInterview]);
+  }, [deepgram, endInterview, flushSpeechBuffer]);
 
   // ── Cleanup on unmount ──
   useEffect(() => {
@@ -298,6 +329,9 @@ export default function AIInterviewRoom() {
       deepgram.stop();
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
       }
     };
   }, []);

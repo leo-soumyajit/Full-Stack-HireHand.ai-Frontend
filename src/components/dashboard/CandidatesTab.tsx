@@ -319,7 +319,7 @@ export function CandidatesTab({
         position_id: positionId,
       });
       toast({ title: "🤖 AI Interview Dispatched!", description: "Magic link sent to candidate. AI will conduct the interview automatically." });
-      onRefresh?.();
+      loadCandidates();
     } catch (err: any) {
       toast({ title: "AI Dispatch Failed", description: err.message || String(err), variant: "destructive" });
     } finally {
