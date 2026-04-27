@@ -12,9 +12,11 @@ import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import CandidateAssessment from "./pages/CandidateAssessment";
 import InterviewRoom from "./pages/InterviewRoom";
+import AIInterviewRoom from "./pages/AIInterviewRoom";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import "@/styles/ai-interview.css";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +44,7 @@ const App = () => (
               />
               <Route path="/assessment/:token" element={<CandidateAssessment />} />
               <Route path="/interview/:roomId" element={<InterviewRoom />} />
+              <Route path="/ai-interview/:token" element={<AIInterviewRoom />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

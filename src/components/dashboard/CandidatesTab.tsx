@@ -18,6 +18,7 @@ import {
   Send,
   UserMinus,
   RotateCcw,
+  Bot,
 } from "lucide-react";
 import { ResumeScreeningModal } from "./ResumeScreeningModal";
 import { SchedulingModal } from "./SchedulingModal";
@@ -66,6 +67,7 @@ import { psychometricApi } from "@/lib/psychometricApi";
 import { generateFitmentPDF } from "@/lib/generateFitmentPDF";
 import { emailApi } from "@/lib/emailApi";
 import { assessmentApi, candidatesApi } from "@/lib/api";
+import { aiInterviewApi } from "@/lib/api";
 import { useRoleAccess } from "@/hooks/useRoleAccess";
 
 const STAGES = ["Sourced", "Screened", "Interview L1", "Interview L2", "Offer", "Rejected"];
@@ -133,6 +135,7 @@ export function CandidatesTab({
   const [topN, setTopN] = useState<string>("");
   const [isSendingMail, setIsSendingMail] = useState<string | false>(false);
   const [dispatchingStatus, setDispatchingStatus] = useState<Record<string, boolean>>({});
+  const [aiDispatchingStatus, setAiDispatchingStatus] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
   const { canManageCandidates, canScreenResumes, canSendAssessment, canManageSchedules, canScorePsychometrics } = useRoleAccess();
 
@@ -307,6 +310,23 @@ export function CandidatesTab({
     }
   };
 
+  // ── AI Interview Dispatch ────────────────────────────────────────
+  const handleDispatchAIInterview = async (candidateId: string) => {
+    setAiDispatchingStatus(prev => ({ ...prev, [candidateId]: true }));
+    try {
+      await aiInterviewApi.dispatch({
+        candidate_id: candidateId,
+        position_id: positionId,
+      });
+      toast({ title: "🤖 AI Interview Dispatched!", description: "Magic link sent to candidate. AI will conduct the interview automatically." });
+      onRefresh?.();
+    } catch (err: any) {
+      toast({ title: "AI Dispatch Failed", description: err.message || String(err), variant: "destructive" });
+    } finally {
+      setAiDispatchingStatus(prev => ({ ...prev, [candidateId]: false }));
+    }
+  };
+
   const renderCandidateRow = (c: ApiCandidate, isRejectedList: boolean) => {
     const isManuallyRejected = c.stage === "Rejected" || c.verdict === "No-Go";
     const displayStage = isRejectedList && !isManuallyRejected ? "Rejected" : c.stage;
@@ -385,6 +405,10 @@ export function CandidatesTab({
                   <DropdownMenuItem onClick={() => handleDispatchAssessment(c.id)} disabled={dispatchingStatus[c.id] || isManuallyRejected} className="gap-2 cursor-pointer">
                     {dispatchingStatus[c.id] ? <Loader2 className="h-4 w-4 animate-spin text-purple-400" /> : <Send className="h-4 w-4 text-purple-400" />}
                     <span>{dispatchingStatus[c.id] ? "Dispatching..." : "Dispatch Assessment"}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDispatchAIInterview(c.id)} disabled={aiDispatchingStatus[c.id] || isManuallyRejected} className="gap-2 cursor-pointer">
+                    {aiDispatchingStatus[c.id] ? <Loader2 className="h-4 w-4 animate-spin text-cyan-400" /> : <Bot className="h-4 w-4 text-cyan-400" />}
+                    <span>{aiDispatchingStatus[c.id] ? "Dispatching..." : "Dispatch AI Interview"}</span>
                   </DropdownMenuItem>
                 </>
               )}

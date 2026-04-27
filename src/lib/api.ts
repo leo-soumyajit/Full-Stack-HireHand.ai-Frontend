@@ -218,3 +218,36 @@ export const teamApi = {
       method: 'DELETE',
     }),
 };
+
+// ══════════════════════════════════════════════════════════════════════
+// AI Interview API — 100% NEW, does NOT modify any existing API
+// ══════════════════════════════════════════════════════════════════════
+
+export const aiInterviewApi = {
+  dispatch: (data: {
+    candidate_id: string;
+    position_id: string;
+    round?: number;
+    interview_type?: string;
+    max_questions?: number;
+    time_limit_minutes?: number;
+    voice?: string;
+  }) =>
+    apiFetch<{ message: string; token: string; url: string }>('/api/ai-interview/dispatch', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getVoices: () =>
+    apiFetch<{ voices: Array<{ key: string; name: string; description: string; model: string }> }>('/api/ai-interview/voices/list'),
+
+  getStatus: (token: string) =>
+    apiFetch<{
+      status: string;
+      started_at: string | null;
+      completed_at: string | null;
+      duration_seconds: number;
+      question_count: number;
+      analysis_id: string | null;
+    }>(`/api/ai-interview/${token}/status`),
+};
