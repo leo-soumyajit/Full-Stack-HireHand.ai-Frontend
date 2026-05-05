@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { InsightChatWidget } from "@/components/chatbot/InsightChatWidget";
 import {
   Video,
   Brain,
@@ -1223,13 +1224,15 @@ function TranscriptView({ transcript, parsedQA, candidateName, candidateId, posi
         </div>
       ) : (
         /* ── Insight AI Chat View ───────────────────────────────────────── */
-        <div className="w-full h-[65vh] rounded-2xl overflow-hidden border border-indigo-500/20 shadow-lg shadow-indigo-500/5 relative">
-          <InsightChatWidget 
-            candidateId={candidateId} 
-            positionId={positionId} 
-            candidateName={candidateName} 
-          />
-        </div>
+        <Card className="glass-card overflow-hidden" style={{ height: "65vh" }}>
+          <div className="relative w-full h-full">
+            <InsightChatWidget 
+              candidateId={candidateId} 
+              positionId={positionId} 
+              candidateName={candidateName} 
+            />
+          </div>
+        </Card>
       )}
 
       {/* Metadata */}
