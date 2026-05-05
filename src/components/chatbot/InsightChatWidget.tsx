@@ -78,6 +78,13 @@ export function InsightChatWidget({ candidateId, positionId, candidateName }: Pr
     }
   }, [isOpen]);
 
+  // Listen for external open events
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener("open-insight-chat", handleOpen);
+    return () => window.removeEventListener("open-insight-chat", handleOpen);
+  }, []);
+
   // Load suggestions when chat opens
   useEffect(() => {
     if (isOpen && suggestions.length === 0) {
@@ -167,27 +174,6 @@ export function InsightChatWidget({ candidateId, positionId, candidateName }: Pr
 
   return (
     <>
-      {/* ── Floating Chat Button ── */}
-      <AnimatePresence>
-        {!isOpen && (
-          <motion.button
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setIsOpen(true)}
-            className="insight-chat-fab"
-            title="Ask AI about this candidate"
-          >
-            <div className="insight-chat-fab-inner">
-              <MessageCircle className="w-6 h-6" />
-            </div>
-            <span className="insight-chat-fab-pulse" />
-          </motion.button>
-        )}
-      </AnimatePresence>
-
       {/* ── Chat Panel ── */}
       <AnimatePresence>
         {isOpen && (

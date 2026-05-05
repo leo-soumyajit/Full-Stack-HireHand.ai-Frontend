@@ -1132,7 +1132,15 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
           >
             📋 Q&A Pairs
           </button>
-        <span className="text-xs text-muted-foreground ml-auto">
+          
+        <button
+          onClick={() => window.dispatchEvent(new Event("open-insight-chat"))}
+          className="ml-auto flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-all shadow-sm shadow-indigo-500/20"
+        >
+          <Sparkles className="w-4 h-4" /> Ask AI
+        </button>
+
+        <span className="text-xs text-muted-foreground ml-2">
           {viewMode === "chat" ? `${chatMessages.length} messages` : `${qaList.length} questions`}
         </span>
       </div>
