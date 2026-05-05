@@ -11,7 +11,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  MessageCircle, X, Send, Loader2, Sparkles, Bot, User, ChevronDown,
+  Send, Loader2, Sparkles, Bot, User, ChevronDown,
   Zap, Brain, MessagesSquare, Target, Lightbulb
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
@@ -53,7 +53,6 @@ const categoryIcon = (cat: string) => {
 // ══════════════════════════════════════════════════════════════
 
 export function InsightChatWidget({ candidateId, positionId, candidateName }: Props) {
-  const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -73,24 +72,15 @@ export function InsightChatWidget({ candidateId, positionId, candidateName }: Pr
 
   // Focus input when chat opens
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 300);
-    }
-  }, [isOpen]);
-
-  // Listen for external open events
-  useEffect(() => {
-    const handleOpen = () => setIsOpen(true);
-    window.addEventListener("open-insight-chat", handleOpen);
-    return () => window.removeEventListener("open-insight-chat", handleOpen);
+    setTimeout(() => inputRef.current?.focus(), 300);
   }, []);
 
   // Load suggestions when chat opens
   useEffect(() => {
-    if (isOpen && suggestions.length === 0) {
+    if (suggestions.length === 0) {
       loadSuggestions();
     }
-  }, [isOpen]);
+  }, []);
 
   // Reset when candidate changes
   useEffect(() => {
@@ -176,12 +166,11 @@ export function InsightChatWidget({ candidateId, positionId, candidateName }: Pr
     <>
       {/* ── Chat Panel ── */}
       <AnimatePresence>
-        {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.2 }}
             className="insight-chat-panel"
           >
             {/* ── Header ── */}
@@ -197,9 +186,6 @@ export function InsightChatWidget({ candidateId, positionId, candidateName }: Pr
                   </p>
                 </div>
               </div>
-              <button onClick={() => setIsOpen(false)} className="insight-chat-close">
-                <X className="w-5 h-5" />
-              </button>
             </div>
 
             {/* ── Messages Area ── */}
@@ -309,7 +295,6 @@ export function InsightChatWidget({ candidateId, positionId, candidateName }: Pr
               </button>
             </form>
           </motion.div>
-        )}
       </AnimatePresence>
     </>
   );

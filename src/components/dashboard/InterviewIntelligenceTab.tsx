@@ -1084,8 +1084,8 @@ function QualityReportView({ report }: { report: any }) {
 // ══════════════════════════════════════════════════════════════════════
 // TRANSCRIPT VIEW — Full interview conversation history
 // ══════════════════════════════════════════════════════════════════════
-function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: string; parsedQA?: any; candidateName: string }) {
-  const [viewMode, setViewMode] = useState<"chat" | "qa">("chat");
+function TranscriptView({ transcript, parsedQA, candidateName, candidateId, positionId }: { transcript: string; parsedQA?: any; candidateName: string; candidateId: string; positionId: string; }) {
+  const [viewMode, setViewMode] = useState<"chat" | "qa" | "ai">("chat");
 
   // Parse raw transcript into chat messages
   const chatMessages = (transcript || "").split("\n").filter(l => l.trim()).map((line, i) => {
@@ -1134,14 +1134,18 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
           </button>
           
         <button
-          onClick={() => window.dispatchEvent(new Event("open-insight-chat"))}
-          className="ml-auto flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-all shadow-sm shadow-indigo-500/20"
+          onClick={() => setViewMode("ai")}
+          className={`ml-auto flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm ${
+            viewMode === "ai"
+              ? "bg-indigo-600 text-white shadow-indigo-500/20"
+              : "bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-600"
+          }`}
         >
           <Sparkles className="w-4 h-4" /> Ask AI
         </button>
 
         <span className="text-xs text-muted-foreground ml-2">
-          {viewMode === "chat" ? `${chatMessages.length} messages` : `${qaList.length} questions`}
+          {viewMode === "chat" ? `${chatMessages.length} messages` : viewMode === "qa" ? `${qaList.length} questions` : "AI Chat"}
         </span>
       </div>
 
@@ -1186,7 +1190,7 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
             )}
           </div>
         </Card>
-      ) : (
+      ) : viewMode === "qa" ? (
         /* ── Q&A Pairs View ───────────────────────────────────────── */
         <div className="space-y-4">
           {qaList.length === 0 ? (
@@ -1216,6 +1220,15 @@ function TranscriptView({ transcript, parsedQA, candidateName }: { transcript: s
               </Card>
             ))
           )}
+        </div>
+      ) : (
+        /* ── Insight AI Chat View ───────────────────────────────────────── */
+        <div className="w-full h-[65vh] rounded-2xl overflow-hidden border border-indigo-500/20 shadow-lg shadow-indigo-500/5 relative">
+          <InsightChatWidget 
+            candidateId={candidateId} 
+            positionId={positionId} 
+            candidateName={candidateName} 
+          />
         </div>
       )}
 
