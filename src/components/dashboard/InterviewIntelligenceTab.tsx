@@ -408,7 +408,15 @@ export function InterviewIntelligenceTab({ positionId, positionTitle, candidateI
               {reportTab === "interviewer" && <InterviewerReportView report={ir} />}
               {reportTab === "candidate" && <CandidateReportView report={cr} tabSwitches={detail.tab_switch_count} />}
               {reportTab === "quality" && <QualityReportView report={iq} />}
-              {reportTab === "transcript" && <TranscriptView transcript={detail.transcript} parsedQA={detail.parsed_transcript} candidateName={detail.candidate_name} />}
+              {reportTab === "transcript" && (
+                <TranscriptView 
+                  transcript={detail.transcript} 
+                  parsedQA={detail.parsed_transcript} 
+                  candidateName={detail.candidate_name}
+                  candidateId={candidateId || detail.candidate_id}
+                  positionId={positionId}
+                />
+              )}
             </motion.div>
           )}
         </AnimatePresence>

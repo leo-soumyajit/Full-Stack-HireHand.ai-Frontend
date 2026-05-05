@@ -209,11 +209,12 @@ export function InsightChatWidget({ candidateId, positionId, candidateName }: Pr
                 <div className="insight-chat-suggestions">
                   <p className="insight-chat-suggestions-label">Suggested questions:</p>
                   <div className="insight-chat-suggestions-grid">
-                    {suggestions.map((s, i) => (
+                    {suggestions.slice(0, 4).map((s, i) => (
                       <button
                         key={i}
                         onClick={() => handleSuggestionClick(s.text)}
                         className="insight-chat-suggestion-chip"
+                        title={s.text}
                       >
                         {categoryIcon(s.category)}
                         <span>{s.text}</span>
