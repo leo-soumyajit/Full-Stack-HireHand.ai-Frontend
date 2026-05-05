@@ -551,19 +551,4 @@
    RESPONSIVE
    ═══════════════════════════════════════════════════════════ */
 
-@media (max-width: 480px) {
-  .insight-chat-panel {
-    width: calc(100vw - 16px);
-    height: calc(100vh - 16px);
-    bottom: 8px;
-    right: 8px;
-    border-radius: 16px;
-  }
-
-  .insight-chat-fab {
-    bottom: 20px;
-    right: 20px;
-    width: 52px;
-    height: 52px;
-  }
-}
+/* Responsive logic removed since panel is fully inline now */
