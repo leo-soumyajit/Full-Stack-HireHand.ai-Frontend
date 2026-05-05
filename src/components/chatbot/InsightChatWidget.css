@@ -368,10 +368,9 @@
 .insight-chat-input-area {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.2);
+  gap: 12px;
+  padding: 16px 20px;
+  background: transparent;
   flex-shrink: 0;
 }
 
@@ -509,13 +508,6 @@
   background: rgba(99, 102, 241, 0.08);
   color: #6366f1;
   border-color: rgba(99, 102, 241, 0.12);
-}
-
-:root[class~="light"] .insight-chat-input-area,
-[data-theme="light"] .insight-chat-input-area,
-.light .insight-chat-input-area {
-  border-top-color: #e2e8f0;
-  background: rgba(248, 250, 252, 0.8);
 }
 
 :root[class~="light"] .insight-chat-input,
