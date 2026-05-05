@@ -306,37 +306,29 @@
   word-break: break-word;
 }
 
-/* ── Markdown Styles ── */
+/* ── Tailwind Typography Overrides ── */
+.insight-markdown {
+  color: inherit !important;
+}
+.insight-markdown strong, 
+.insight-markdown h1, 
+.insight-markdown h2, 
+.insight-markdown h3, 
+.insight-markdown h4 {
+  color: inherit !important;
+}
+/* Reduce huge gaps between nested lists in markdown */
 .insight-markdown p {
-  margin: 0 0 8px 0;
-}
-.insight-markdown p:last-child {
-  margin-bottom: 0;
-}
-.insight-markdown strong {
-  font-weight: 600;
-  color: #ffffff;
-}
-:root[class~="light"] .insight-markdown strong,
-[data-theme="light"] .insight-markdown strong,
-.light .insight-markdown strong {
-  color: #111827;
-}
-.insight-markdown ul {
-  margin: 8px 0;
-  padding-left: 20px;
-  list-style-type: disc;
+  margin-top: 0.2em !important;
+  margin-bottom: 0.2em !important;
 }
 .insight-markdown li {
-  margin-bottom: 4px;
+  margin-top: 0.1em !important;
+  margin-bottom: 0.1em !important;
 }
-.insight-markdown li:last-child {
-  margin-bottom: 0;
-}
-.insight-markdown ol {
-  margin: 8px 0;
-  padding-left: 20px;
-  list-style-type: decimal;
+.insight-markdown ul {
+  margin-top: 0.2em !important;
+  margin-bottom: 0.2em !important;
 }
 
 .insight-chat-msg-user .insight-chat-msg-text {
