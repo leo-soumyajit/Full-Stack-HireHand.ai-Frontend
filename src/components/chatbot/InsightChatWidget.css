@@ -146,14 +146,15 @@
 .insight-chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 16px;
+  padding: 24px 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-
-  /* Custom scrollbar */
+  
   scrollbar-width: thin;
   scrollbar-color: rgba(99, 102, 241, 0.3) transparent;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
 }
 
 .insight-chat-messages::-webkit-scrollbar {
@@ -303,6 +304,39 @@
   line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* ── Markdown Styles ── */
+.insight-markdown p {
+  margin: 0 0 8px 0;
+}
+.insight-markdown p:last-child {
+  margin-bottom: 0;
+}
+.insight-markdown strong {
+  font-weight: 600;
+  color: #ffffff;
+}
+:root[class~="light"] .insight-markdown strong,
+[data-theme="light"] .insight-markdown strong,
+.light .insight-markdown strong {
+  color: #111827;
+}
+.insight-markdown ul {
+  margin: 8px 0;
+  padding-left: 20px;
+  list-style-type: disc;
+}
+.insight-markdown li {
+  margin-bottom: 4px;
+}
+.insight-markdown li:last-child {
+  margin-bottom: 0;
+}
+.insight-markdown ol {
+  margin: 8px 0;
+  padding-left: 20px;
+  list-style-type: decimal;
 }
 
 .insight-chat-msg-user .insight-chat-msg-text {

@@ -14,6 +14,8 @@ import {
   Send, Loader2, Sparkles, Bot, User, ChevronDown,
   Zap, Brain, MessagesSquare, Target, Lightbulb
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { apiFetch } from "@/lib/api";
 import "./InsightChatWidget.css";
 
@@ -240,7 +242,17 @@ export function InsightChatWidget({ candidateId, positionId, candidateName }: Pr
                     )}
                   </div>
                   <div className="insight-chat-msg-content">
-                    <div className="insight-chat-msg-text">{msg.content}</div>
+                    <div className="insight-chat-msg-text">
+                      {msg.role === "ai" ? (
+                        <div className="insight-markdown">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {msg.content}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="whitespace-pre-wrap m-0">{msg.content}</p>
+                      )}
+                    </div>
                     {msg.sources && msg.sources.length > 0 && (
                       <div className="insight-chat-msg-sources">
                         {msg.sources.slice(0, 4).map((s, j) => (
