@@ -243,7 +243,7 @@ export function InsightChatWidget({ candidateId, positionId, candidateName }: Pr
                   </div>
                   <div className="insight-chat-msg-content">
                     <div className="insight-chat-msg-text">
-                      {msg.role === "ai" ? (
+                      {msg.role === "assistant" ? (
                         <div className="insight-markdown">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {msg.content}

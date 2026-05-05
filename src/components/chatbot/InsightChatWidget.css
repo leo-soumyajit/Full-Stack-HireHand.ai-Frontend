@@ -154,7 +154,7 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(99, 102, 241, 0.3) transparent;
   scroll-behavior: smooth;
-  overscroll-behavior: contain;
+  overscroll-behavior: none;
 }
 
 .insight-chat-messages::-webkit-scrollbar {
