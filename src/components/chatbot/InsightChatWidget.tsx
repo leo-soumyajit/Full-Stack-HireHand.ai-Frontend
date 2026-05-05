@@ -246,7 +246,7 @@ export function InsightChatWidget({ candidateId, positionId, candidateName }: Pr
                   <div className="insight-chat-msg-content">
                     <div className="insight-chat-msg-text">
                       {msg.role === "assistant" ? (
-                        <div className="insight-markdown prose prose-sm max-w-none">
+                        <div className="insight-markdown">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {msg.content}
                           </ReactMarkdown>

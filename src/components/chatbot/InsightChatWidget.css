@@ -306,29 +306,98 @@
   word-break: break-word;
 }
 
-/* ── Tailwind Typography Overrides ── */
+/* ── Markdown Rendering ─────────────────────────────────── */
 .insight-markdown {
-  color: inherit !important;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: inherit;
 }
-.insight-markdown strong, 
-.insight-markdown h1, 
-.insight-markdown h2, 
-.insight-markdown h3, 
-.insight-markdown h4 {
-  color: inherit !important;
-}
-/* Reduce huge gaps between nested lists in markdown */
+
 .insight-markdown p {
-  margin-top: 0.2em !important;
-  margin-bottom: 0.2em !important;
+  margin: 0 0 6px 0;
 }
-.insight-markdown li {
-  margin-top: 0.1em !important;
-  margin-bottom: 0.1em !important;
+.insight-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.insight-markdown strong {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.insight-markdown ul,
+.insight-markdown ol {
+  margin: 4px 0;
+  padding-left: 18px;
 }
 .insight-markdown ul {
-  margin-top: 0.2em !important;
-  margin-bottom: 0.2em !important;
+  list-style-type: disc;
+}
+.insight-markdown ol {
+  list-style-type: decimal;
+}
+
+.insight-markdown li {
+  margin: 2px 0;
+  padding-left: 2px;
+}
+.insight-markdown li > p {
+  margin: 0;
+  display: inline;
+}
+
+.insight-markdown li > ul,
+.insight-markdown li > ol {
+  margin: 2px 0 2px 0;
+}
+
+.insight-markdown h1,
+.insight-markdown h2,
+.insight-markdown h3,
+.insight-markdown h4 {
+  font-weight: 700;
+  color: #ffffff;
+  margin: 8px 0 4px 0;
+}
+.insight-markdown h1 { font-size: 16px; }
+.insight-markdown h2 { font-size: 15px; }
+.insight-markdown h3 { font-size: 14px; }
+.insight-markdown h4 { font-size: 13.5px; }
+
+.insight-markdown code {
+  background: rgba(99, 102, 241, 0.15);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'Fira Code', monospace;
+}
+
+.insight-markdown blockquote {
+  border-left: 3px solid #6366f1;
+  margin: 6px 0;
+  padding: 4px 12px;
+  color: #9ca3af;
+}
+
+/* Light mode markdown overrides */
+:root[class~="light"] .insight-markdown strong,
+[data-theme="light"] .insight-markdown strong,
+.light .insight-markdown strong {
+  color: #111827;
+}
+:root[class~="light"] .insight-markdown h1,
+:root[class~="light"] .insight-markdown h2,
+:root[class~="light"] .insight-markdown h3,
+:root[class~="light"] .insight-markdown h4,
+[data-theme="light"] .insight-markdown h1,
+[data-theme="light"] .insight-markdown h2,
+[data-theme="light"] .insight-markdown h3,
+[data-theme="light"] .insight-markdown h4,
+.light .insight-markdown h1,
+.light .insight-markdown h2,
+.light .insight-markdown h3,
+.light .insight-markdown h4 {
+  color: #111827;
 }
 
 .insight-chat-msg-user .insight-chat-msg-text {
