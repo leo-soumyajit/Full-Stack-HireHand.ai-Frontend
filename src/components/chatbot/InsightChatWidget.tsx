@@ -174,6 +174,8 @@ export function InsightChatWidget({ candidateId, positionId, candidateName }: Pr
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.2 }}
             className="insight-chat-panel"
+            onWheel={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
           >
             {/* ── Header ── */}
             <div className="insight-chat-header">
