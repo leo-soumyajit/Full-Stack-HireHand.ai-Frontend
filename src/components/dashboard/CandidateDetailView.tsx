@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiFetch, candidatesApi, assessmentApi } from "@/lib/api";
 import { psychometricApi } from "@/lib/psychometricApi";
 import { generateFitmentPDF } from "@/lib/generateFitmentPDF";
+import { InsightChatWidget } from "@/components/chatbot/InsightChatWidget";
 
 function getToken(): string | null {
   try {
@@ -462,6 +463,15 @@ export function CandidateDetailView({ candidateId, positionId, initialTab = "res
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* HireHand Insight AI — RAG Chatbot (100% Isolated) */}
+      {candidate && (
+        <InsightChatWidget
+          candidateId={candidateId}
+          positionId={positionId}
+          candidateName={candidate.name}
+        />
+      )}
     </motion.div>
   );
 }
