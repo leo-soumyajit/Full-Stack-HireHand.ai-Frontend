@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { 
   ArrowLeft, Download, Briefcase, Mail, CheckCircle2, AlertCircle, Loader2, Sparkles, BrainCircuit,
   MoreVertical, Trash2, UserMinus, RotateCcw, Send, CalendarIcon, FileBarChart, Brain,
-  Linkedin, Github, Link
+  Linkedin, Github, Link, ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -381,6 +381,36 @@ export function CandidateDetailView({ candidateId, positionId, initialTab = "res
                 <p className="text-[15px] text-muted-foreground/90 leading-loose">
                   {candidate.resume_analysis.verdict_rationale}
                 </p>
+              </div>
+            )}
+
+            {/* Non-Negotiables Check */}
+            {candidate.resume_analysis?.non_negotiables_check && candidate.resume_analysis.non_negotiables_check.length > 0 && (
+              <div className="p-8 mt-8 rounded-2xl bg-card border border-red-500/20 shadow-xl overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-red-500 to-red-600" />
+                <h3 className="font-semibold text-foreground mb-5 text-xl flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-red-500 dark:text-red-400" /> Non-Negotiable Screening
+                  <span className="text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 rounded-full px-2.5 py-0.5 uppercase tracking-wider">
+                    {candidate.resume_analysis.non_negotiables_check.filter((n: any) => n.met).length}/{candidate.resume_analysis.non_negotiables_check.length} Met
+                  </span>
+                </h3>
+                <div className="space-y-3">
+                  {candidate.resume_analysis.non_negotiables_check.map((check: any, idx: number) => (
+                    <div key={idx} className={`p-4 rounded-xl border flex items-start gap-3 ${check.met ? 'border-emerald-500/20 bg-emerald-500/[0.03]' : 'border-red-500/20 bg-red-500/[0.03]'}`}>
+                      <span className={`shrink-0 text-lg mt-0.5 ${check.met ? 'text-emerald-500' : 'text-red-500'}`}>
+                        {check.met ? '✅' : '❌'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold ${check.met ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                          {check.requirement}
+                        </p>
+                        {check.reason && (
+                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{check.reason}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             </TabsContent>

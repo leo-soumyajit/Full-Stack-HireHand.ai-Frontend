@@ -67,6 +67,7 @@ interface GenerateInterviewQuestionsParams {
   category: string;
   counts: { easy: number; medium: number; hard: number };
   existingQuestions?: ApiL1Question[];
+  nonNegotiables?: string[];
 }
 
 export async function generateInterviewQuestions({
@@ -76,6 +77,7 @@ export async function generateInterviewQuestions({
   category,
   counts,
   existingQuestions,
+  nonNegotiables,
 }: GenerateInterviewQuestionsParams): Promise<ApiL1Question[]> {
   try {
     const data = await apiFetch<{ questions: ApiL1Question[] }>('/api/ai/generate-interview', {
@@ -86,7 +88,8 @@ export async function generateInterviewQuestions({
         level,
         category,
         counts,
-        existing_questions: existingQuestions
+        existing_questions: existingQuestions,
+        non_negotiables: nonNegotiables,
       })
     });
     return data.questions;

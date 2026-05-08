@@ -125,6 +125,7 @@ export function PositionL1QuestionsTab({ position, onSave }: Props) {
         category: activeCategory,
         counts,
         existingQuestions: allQuestions, // Pass ALL existing questions so AI avoids repeating
+        nonNegotiables: position.jd.non_negotiables || [],
       });
 
       // Append new questions to the global array
