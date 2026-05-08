@@ -30,14 +30,19 @@ import {
   Activity,
   X,
   ListChecks,
+  Trash2,
+  Plus,
+  Pencil,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MainLoader } from "@/components/ui/main-loader";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ApiPosition, ApiPositionJD } from "@/types/api";
 import { usePositions } from "@/hooks/usePositions";
+import { apiFetch } from "@/lib/api";
 import { enhanceJDWithAI, enhanceFullJDWithAI } from "@/lib/openrouter";
 import { PsychometricsTab } from "@/components/dashboard/PsychometricsTab";
 import { useToast } from "@/hooks/use-toast";
@@ -710,14 +715,14 @@ function JDContentCard({ jd, className = "", compareWith, side }: JDContentCardP
       {jd.non_negotiables && jd.non_negotiables.length > 0 && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4">
           <div className="flex items-center gap-2 mb-2">
-            <ShieldCheck className="h-3.5 w-3.5 text-red-400 shrink-0" />
-            <h4 className="text-xs font-bold text-red-400 font-display uppercase tracking-wide">Non-Negotiables</h4>
-            <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/25 rounded px-1.5 py-0.5 font-semibold uppercase tracking-wider">Must Have</span>
+            <ShieldCheck className="h-3.5 w-3.5 text-red-500 dark:text-red-400 shrink-0" />
+            <h4 className="text-xs font-bold text-red-600 dark:text-red-400 font-display uppercase tracking-wide">Non-Negotiables</h4>
+            <span className="text-[9px] bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/25 rounded px-1.5 py-0.5 font-semibold uppercase tracking-wider">Must Have</span>
           </div>
           <ul className="space-y-1">
             {jd.non_negotiables.map((item, i) => (
-              <li key={i} className="text-xs text-red-300/90 flex items-start gap-1.5">
-                <span className="text-red-400 mt-0.5 shrink-0">⚠</span> {item}
+              <li key={i} className="text-xs text-red-800 dark:text-red-300/90 flex items-start gap-1.5">
+                <span className="text-red-500 dark:text-red-400 mt-0.5 shrink-0">⚠</span> {item}
               </li>
             ))}
           </ul>
@@ -1307,26 +1312,318 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
         </CardContent>
       </Card>
 
-      {/* Non-Negotiables */}
-      {jd.non_negotiables && jd.non_negotiables.length > 0 && (
-        <Card className="border-red-500/30 bg-red-500/5">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <ShieldCheck className="h-4 w-4 text-red-400" />
-              <h3 className="text-sm font-semibold text-red-400 font-display">Non-Negotiable Requirements</h3>
-              <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-400 border-red-500/30 font-bold uppercase">Must Have</Badge>
+      {/* Non-Negotiables — Editable */}
+      <NonNegotiablesEditor jd={jd} position={position} onJDSaved={onJDSaved} />
+      </div>
+    </div>
+  );
+}
+
+/* ── Non-Negotiables Inline Editor ──────────────────────────────────────────── */
+
+function NonNegotiablesEditor({
+  jd,
+  position,
+  onJDSaved,
+}: {
+  jd: ApiPositionJD;
+  position: ApiPosition;
+  onJDSaved: (jd: ApiPositionJD, versionCounter: number) => void;
+}) {
+  const { toast } = useToast();
+  const [mode, setMode] = useState<"view" | "edit" | "ai">("view");
+  const [items, setItems] = useState<string[]>(jd.non_negotiables || []);
+  const [newItem, setNewItem] = useState("");
+  const [aiInstruction, setAiInstruction] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync when JD changes externally
+  useEffect(() => {
+    setItems(jd.non_negotiables || []);
+  }, [jd.non_negotiables]);
+
+  const handleRemove = (index: number) => {
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAdd = () => {
+    const val = newItem.trim();
+    if (!val) return;
+    setItems((prev) => [...prev, val]);
+    setNewItem("");
+  };
+
+  const handleItemChange = (index: number, value: string) => {
+    setItems((prev) => prev.map((item, i) => (i === index ? value : item)));
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const updatedJD: ApiPositionJD = { ...jd, non_negotiables: items.filter((i) => i.trim()) };
+      const nextVersion = (position.jd_versions?.length ?? 0) + 1;
+      onJDSaved(updatedJD, nextVersion);
+      setMode("view");
+      toast({ title: "Non-Negotiables Updated", description: `Saved as part of JD v${nextVersion}.` });
+    } catch {
+      toast({ title: "Save Failed", description: "Could not update non-negotiables.", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAIGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const data = await apiFetch<{ non_negotiables: string[] }>("/api/ai/generate-non-negotiables", {
+        method: "POST",
+        body: JSON.stringify({
+          role_title: position.title,
+          level: position.level,
+          jd_purpose: jd.purpose || "",
+          jd_skills: jd.skills || [],
+          jd_experience: jd.experience || [],
+          custom_instruction: aiInstruction,
+        }),
+      });
+      const generated = data.non_negotiables || [];
+      if (generated.length > 0) {
+        setItems(generated);
+        setMode("edit");
+        setAiInstruction("");
+        toast({ title: "AI Generated!", description: `${generated.length} non-negotiables generated. Review and save.` });
+      } else {
+        toast({ title: "No Results", description: "AI returned empty. Try different instructions.", variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "AI Generation Failed", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // ── VIEW MODE ─────────────────────────────────────────────────────────────
+  if (mode === "view") {
+    return (
+      <Card className="border-red-500/30 bg-red-500/[0.03] dark:bg-red-500/5 overflow-hidden relative group">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500/60 via-red-400/40 to-transparent" />
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                <ShieldCheck className="h-4 w-4 text-red-500 dark:text-red-400" />
+              </div>
+              <h3 className="text-sm font-semibold text-red-700 dark:text-red-400 font-display">Non-Negotiable Requirements</h3>
+              <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 font-bold uppercase">
+                Must Have
+              </Badge>
             </div>
-            <ul className="space-y-2">
-              {jd.non_negotiables.map((item, i) => (
-                <li key={i} className="text-sm text-red-300/90 flex items-start gap-2">
-                  <span className="text-red-400 mt-1 shrink-0">⚠</span> {item}
+            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10"
+                onClick={() => setMode("edit")}
+              >
+                <Pencil className="h-3 w-3 mr-1" /> Edit Manually
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => setMode("ai")}
+              >
+                <Sparkles className="h-3 w-3 mr-1" /> Regenerate with AI
+              </Button>
+            </div>
+          </div>
+
+          {items.length > 0 ? (
+            <ul className="space-y-2.5">
+              {items.map((item, i) => (
+                <li key={i} className="text-sm text-foreground/80 dark:text-red-300/90 flex items-start gap-2.5 p-2.5 rounded-lg bg-red-500/[0.04] dark:bg-red-500/[0.06] border border-red-500/10">
+                  <span className="text-red-500 dark:text-red-400 mt-0.5 shrink-0 text-base">⚠</span>
+                  <span>{item}</span>
                 </li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
-      )}
-      </div>
-    </div>
+          ) : (
+            <div className="text-center py-8 space-y-3">
+              <ShieldCheck className="h-8 w-8 text-muted-foreground/30 mx-auto" />
+              <p className="text-sm text-muted-foreground">No non-negotiable requirements defined yet.</p>
+              <div className="flex items-center justify-center gap-2">
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => setMode("edit")}>
+                  <Plus className="h-3 w-3 mr-1" /> Add Manually
+                </Button>
+                <Button variant="outline" size="sm" className="text-xs border-primary/30 text-primary" onClick={() => setMode("ai")}>
+                  <Sparkles className="h-3 w-3 mr-1" /> Generate with AI
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ── AI MODE ───────────────────────────────────────────────────────────────
+  if (mode === "ai") {
+    return (
+      <Card className="border-primary/30 bg-primary/[0.02] dark:bg-primary/5 overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/60 via-primary/40 to-transparent" />
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/20">
+              <Sparkles className="h-4 w-4 text-primary" />
+            </div>
+            <h3 className="text-sm font-semibold text-foreground font-display">AI Non-Negotiables Generator</h3>
+          </div>
+
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Our AI will analyze the role title, level, JD purpose, skills, and experience to generate role-specific non-negotiable requirements.
+            Optionally provide custom instructions to guide the AI.
+          </p>
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Custom Instructions <span className="text-muted-foreground/60">(optional)</span></label>
+            <Textarea
+              placeholder="E.g., 'Must include AWS certification', 'Focus on security compliance', 'Require at least 8 years backend experience'..."
+              value={aiInstruction}
+              onChange={(e) => setAiInstruction(e.target.value)}
+              className="min-h-[80px] bg-background/50 border-border/50 focus:border-primary text-sm resize-none"
+              disabled={isGenerating}
+            />
+          </div>
+
+          <div className="p-3 rounded-lg bg-muted/30 border border-border/40">
+            <p className="text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground">Context being used:</span> {position.title} · {position.level} · {jd.skills?.slice(0, 5).join(", ") || "No skills"}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Button variant="ghost" size="sm" onClick={() => { setMode("view"); setAiInstruction(""); }} disabled={isGenerating}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleAIGenerate}
+              disabled={isGenerating}
+              className="gradient-primary text-primary-foreground font-semibold rounded-lg hover:opacity-90 min-w-[160px]"
+            >
+              {isGenerating ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                  Generating...
+                </div>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-1" />
+                  Generate Non-Negotiables
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ── EDIT MODE ─────────────────────────────────────────────────────────────
+  return (
+    <Card className="border-amber-500/30 bg-amber-500/[0.02] dark:bg-amber-500/5 overflow-hidden relative">
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500/60 via-amber-400/40 to-transparent" />
+      <CardContent className="p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <Pencil className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-foreground font-display">Edit Non-Negotiables</h3>
+            <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10">Editing</Badge>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/10"
+            onClick={() => setMode("ai")}
+          >
+            <Sparkles className="h-3 w-3 mr-1" /> Use AI Instead
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          {items.map((item, i) => (
+            <div key={i} className="flex items-center gap-2 group/item">
+              <span className="text-red-500 dark:text-red-400 shrink-0 text-sm font-bold w-5 text-center">{i + 1}</span>
+              <Input
+                value={item}
+                onChange={(e) => handleItemChange(i, e.target.value)}
+                className="flex-1 text-sm bg-background/60 border-border/50 focus:border-primary"
+                placeholder="Enter non-negotiable requirement..."
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-red-400 hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover/item:opacity-100 transition-opacity shrink-0"
+                onClick={() => handleRemove(i)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        {/* Add new item */}
+        <div className="flex items-center gap-2 pt-1">
+          <span className="text-muted-foreground/50 shrink-0 text-sm font-bold w-5 text-center">+</span>
+          <Input
+            value={newItem}
+            onChange={(e) => setNewItem(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }}
+            className="flex-1 text-sm bg-background/60 border-border/50 border-dashed focus:border-primary"
+            placeholder="Add a new non-negotiable requirement..."
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 shrink-0"
+            onClick={handleAdd}
+            disabled={!newItem.trim()}
+          >
+            <Plus className="h-3 w-3 mr-1" /> Add
+          </Button>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-between pt-3 border-t border-border/30">
+          <p className="text-[11px] text-muted-foreground">{items.filter((i) => i.trim()).length} requirement{items.filter((i) => i.trim()).length !== 1 ? "s" : ""}</p>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => { setItems(jd.non_negotiables || []); setMode("view"); setNewItem(""); }} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="gradient-primary text-primary-foreground font-semibold rounded-lg hover:opacity-90 min-w-[120px]"
+            >
+              {isSaving ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                  Saving...
+                </div>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
