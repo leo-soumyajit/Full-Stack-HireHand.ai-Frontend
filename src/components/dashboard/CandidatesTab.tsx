@@ -154,6 +154,9 @@ export function CandidatesTab({
     voice: "asteria",
     time_limit_minutes: 20,
     max_questions: 10,
+    scheduled_at: "",
+    link_expiry_hours: 168,
+    hr_notes: "",
   });
   const { toast } = useToast();
   const { canManageCandidates, canScreenResumes, canSendAssessment, canManageSchedules, canScorePsychometrics } = useRoleAccess();
@@ -331,7 +334,7 @@ export function CandidatesTab({
 
   // ── AI Interview Dispatch ────────────────────────────────────────
   const openAiConfigModal = (candidateId: string, candidateName: string) => {
-    setAiConfig({ interview_type: "hybrid", custom_type: "", voice: "asteria", time_limit_minutes: 20, max_questions: 10 });
+    setAiConfig({ interview_type: "hybrid", custom_type: "", voice: "asteria", time_limit_minutes: 20, max_questions: 10, scheduled_at: "", link_expiry_hours: 168, hr_notes: "" });
     setAiConfigModal({ candidateId, candidateName });
   };
 
@@ -349,6 +352,9 @@ export function CandidatesTab({
         voice: aiConfig.voice,
         time_limit_minutes: aiConfig.time_limit_minutes,
         max_questions: aiConfig.max_questions,
+        scheduled_at: aiConfig.scheduled_at || "",
+        link_expiry_hours: aiConfig.link_expiry_hours,
+        hr_notes: aiConfig.hr_notes,
       });
       toast({ title: "🤖 AI Interview Dispatched!", description: "Magic link sent to candidate. AI will conduct the interview automatically." });
       loadCandidates();
@@ -779,6 +785,58 @@ export function CandidatesTab({
                 <span>3 Qs</span>
                 <span>20 Qs</span>
               </div>
+            </div>
+
+            {/* Schedule */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-cyan-400" />
+                Schedule Interview <span className="text-xs text-muted-foreground ml-1">(optional)</span>
+              </Label>
+              <Input
+                type="datetime-local"
+                value={aiConfig.scheduled_at ? aiConfig.scheduled_at.slice(0, 16) : ""}
+                onChange={(e) => setAiConfig(prev => ({ ...prev, scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : "" }))}
+                className="bg-muted/50 border-border/40"
+              />
+              <p className="text-xs text-muted-foreground">Leave empty for immediate access</p>
+            </div>
+
+            {/* Link Expiry */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-cyan-400" />
+                Link Validity
+              </Label>
+              <Select value={String(aiConfig.link_expiry_hours)} onValueChange={(v) => setAiConfig(prev => ({ ...prev, link_expiry_hours: Number(v) }))}>
+                <SelectTrigger className="bg-muted/50 border-border/40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 Hour</SelectItem>
+                  <SelectItem value="6">6 Hours</SelectItem>
+                  <SelectItem value="12">12 Hours</SelectItem>
+                  <SelectItem value="24">24 Hours (1 Day)</SelectItem>
+                  <SelectItem value="72">3 Days</SelectItem>
+                  <SelectItem value="168">7 Days (Default)</SelectItem>
+                  <SelectItem value="336">14 Days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* HR Notes */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Mic className="h-3.5 w-3.5 text-cyan-400" />
+                Notes for Candidate <span className="text-xs text-muted-foreground ml-1">(optional)</span>
+              </Label>
+              <textarea
+                value={aiConfig.hr_notes}
+                onChange={(e) => setAiConfig(prev => ({ ...prev, hr_notes: e.target.value }))}
+                placeholder="Add any special instructions or notes for the candidate..."
+                rows={3}
+                className="w-full rounded-md bg-muted/50 border border-border/40 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              />
             </div>
           </div>
 
