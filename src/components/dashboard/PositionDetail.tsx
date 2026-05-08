@@ -1085,35 +1085,68 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
             <p className="text-lg font-semibold text-foreground font-display">No Job Description Yet</p>
             <p className="text-sm text-muted-foreground mt-1">Choose how you'd like to add one.</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg mx-auto">
-            <button
-              onClick={() => setJdView("paste")}
-              className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border/40 hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 group relative overflow-hidden"
-            >
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl gradient-primary group-hover:glow-sm transition-all z-10">
-                <Edit3 className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <div className="text-center z-10">
-                <p className="font-semibold text-foreground text-sm flex items-center justify-center gap-1">Paste <Sparkles className="h-3 w-3 text-primary" /></p>
-                <p className="text-xs text-muted-foreground mt-1">AI will enhance formatting</p>
-              </div>
-            </button>
-            <button
-              onClick={() => {
-                setJdText("");
-                setJdView("enhance_full");
-              }}
-              className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border/40 hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 group cursor-pointer"
-            >
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-muted group-hover:bg-muted/80 transition-all">
-                <FileText className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold text-foreground text-sm flex items-center justify-center gap-1">Enhance Existing JD <Sparkles className="h-3 w-3 text-primary" /></p>
-                <p className="text-xs text-muted-foreground mt-1">Paste a full JD to convert</p>
-              </div>
-            </button>
-          </div>
+
+          {isEnhancing ? (
+            <div className="flex flex-col items-center gap-4 py-8">
+              <div className="h-10 w-10 border-3 border-primary/30 border-t-primary rounded-full animate-spin" />
+              <p className="text-sm text-muted-foreground font-medium">AI is analyzing and structuring your JD...</p>
+              <p className="text-xs text-muted-foreground/60">This may take a few seconds</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+              {/* Upload File */}
+              <button
+                onClick={() => document.getElementById("jd-file-upload-choice")?.click()}
+                className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border/40 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all duration-200 group relative overflow-hidden cursor-pointer"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] transition-all">
+                  <Upload className="h-6 w-6 text-emerald-500" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-foreground text-sm flex items-center justify-center gap-1">Upload File <Sparkles className="h-3 w-3 text-primary" /></p>
+                  <p className="text-xs text-muted-foreground mt-1">Upload .txt, .pdf, or .docx</p>
+                </div>
+                <input
+                  id="jd-file-upload-choice"
+                  type="file"
+                  accept=".txt,.pdf,.docx,.doc,.md"
+                  onChange={handleFileUploadHeader}
+                  className="hidden"
+                />
+              </button>
+
+              {/* Paste Existing JD */}
+              <button
+                onClick={() => {
+                  setJdText("");
+                  setJdView("enhance_full");
+                }}
+                className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border/40 hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 group relative overflow-hidden cursor-pointer"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-muted group-hover:bg-muted/80 transition-all">
+                  <FileText className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-foreground text-sm flex items-center justify-center gap-1">Paste Existing JD <Sparkles className="h-3 w-3 text-primary" /></p>
+                  <p className="text-xs text-muted-foreground mt-1">Paste full JD to enhance</p>
+                </div>
+              </button>
+
+              {/* Create from Scratch */}
+              <button
+                onClick={() => setJdView("paste")}
+                className="flex flex-col items-center gap-3 p-6 rounded-xl border border-border/40 hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 group relative overflow-hidden"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl gradient-primary group-hover:glow-sm transition-all z-10">
+                  <Edit3 className="h-6 w-6 text-primary-foreground" />
+                </div>
+                <div className="text-center z-10">
+                  <p className="font-semibold text-foreground text-sm flex items-center justify-center gap-1">Create with AI <Sparkles className="h-3 w-3 text-primary" /></p>
+                  <p className="text-xs text-muted-foreground mt-1">Describe role, AI builds JD</p>
+                </div>
+              </button>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
