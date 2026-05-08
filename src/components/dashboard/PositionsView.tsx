@@ -82,7 +82,7 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
   const [modalMode, setModalMode] = useState<ModalMode>("create");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [createdPosition, setCreatedPosition] = useState<ApiPosition | null>(null);
-  const [form, setForm] = useState({ title: "", bu: "", location: "", level: "Mid" });
+  const [form, setForm] = useState({ title: "", bu: "", location: "", level: "Mid", experience: "" });
   const [statusFilter, setStatusFilter] = useState<"Active" | "Closed">("Active");
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingJD, setIsGeneratingJD] = useState(false);
@@ -118,6 +118,7 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
         business_unit: form.bu || "General",
         location: form.location || "Remote",
         level: form.level,
+        years_of_experience: form.level !== "Junior" && form.experience.trim() ? form.experience.trim() : undefined,
       });
       setCreatedPosition(newPos);
       setModalStep("success");
@@ -154,6 +155,7 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
         business_unit: form.bu || "General",
         location: form.location || "Remote",
         level: form.level,
+        years_of_experience: form.level !== "Junior" && form.experience.trim() ? form.experience.trim() : undefined,
       });
       closeModal();
     } catch (err) {
@@ -185,7 +187,7 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
   const openCreateModal = () => {
     setModalMode("create");
     setEditingId(null);
-    setForm({ title: "", bu: "", location: "", level: "Mid" });
+    setForm({ title: "", bu: "", location: "", level: "Mid", experience: "" });
     setModalStep("form");
     setModalOpen(true);
   };
@@ -194,7 +196,7 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
     e.stopPropagation();
     setModalMode("edit");
     setEditingId(pos.id);
-    setForm({ title: pos.title, bu: pos.business_unit, location: pos.location, level: pos.level });
+    setForm({ title: pos.title, bu: pos.business_unit, location: pos.location, level: pos.level, experience: pos.years_of_experience || "" });
     setModalStep("form");
     setModalOpen(true);
   };
@@ -205,7 +207,7 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
     setModalMode("create");
     setEditingId(null);
     setCreatedPosition(null);
-    setForm({ title: "", bu: "", location: "", level: "Mid" });
+    setForm({ title: "", bu: "", location: "", level: "Mid", experience: "" });
   };
 
   return (
@@ -419,7 +421,7 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
                       </div>
                       <div className="space-y-2">
                         <Label className="text-sm text-muted-foreground">Level</Label>
-                        <Select value={form.level} onValueChange={(v) => setForm((f) => ({ ...f, level: v }))}>
+                        <Select value={form.level} onValueChange={(v) => setForm((f) => ({ ...f, level: v, experience: v === "Junior" ? "" : f.experience }))}>
                           <SelectTrigger className="bg-background/50 border-border/50"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Junior">Junior</SelectItem>
@@ -429,6 +431,12 @@ export function PositionsView({ onViewPosition }: PositionsViewProps) {
                           </SelectContent>
                         </Select>
                       </div>
+                      {form.level !== "Junior" && (
+                        <div className="space-y-2">
+                          <Label className="text-sm text-muted-foreground">Experience <span className="text-xs text-muted-foreground/60">(optional)</span></Label>
+                          <Input placeholder="e.g. 3-5 years" value={form.experience} onChange={(e) => setForm((f) => ({ ...f, experience: e.target.value }))} className="bg-background/50 border-border/50 focus:border-primary" />
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center justify-end gap-3 p-6 border-t border-border/30">
                       <Button variant="ghost" onClick={closeModal}>Cancel</Button>

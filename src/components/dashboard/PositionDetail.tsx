@@ -705,6 +705,24 @@ function JDContentCard({ jd, className = "", compareWith, side }: JDContentCardP
           )}
         </div>
       </div>
+
+      {/* Non-Negotiables */}
+      {jd.non_negotiables && jd.non_negotiables.length > 0 && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldCheck className="h-3.5 w-3.5 text-red-400 shrink-0" />
+            <h4 className="text-xs font-bold text-red-400 font-display uppercase tracking-wide">Non-Negotiables</h4>
+            <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/25 rounded px-1.5 py-0.5 font-semibold uppercase tracking-wider">Must Have</span>
+          </div>
+          <ul className="space-y-1">
+            {jd.non_negotiables.map((item, i) => (
+              <li key={i} className="text-xs text-red-300/90 flex items-start gap-1.5">
+                <span className="text-red-400 mt-0.5 shrink-0">⚠</span> {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -1171,6 +1189,11 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
                 lines.push(jd.skills.join(' • '));
                 lines.push('');
               }
+              if (jd.non_negotiables?.length) {
+                lines.push('⚠️ NON-NEGOTIABLE REQUIREMENTS');
+                jd.non_negotiables.forEach((n: string) => lines.push(`⚠ ${n}`));
+                lines.push('');
+              }
               lines.push('—');
               lines.push('Powered by HireHand AI');
               navigator.clipboard.writeText(lines.join('\n')).then(() => {
@@ -1283,6 +1306,26 @@ function JDTab({ position, onJDSaved }: { position: ApiPosition; onJDSaved: (jd:
           </div>
         </CardContent>
       </Card>
+
+      {/* Non-Negotiables */}
+      {jd.non_negotiables && jd.non_negotiables.length > 0 && (
+        <Card className="border-red-500/30 bg-red-500/5">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck className="h-4 w-4 text-red-400" />
+              <h3 className="text-sm font-semibold text-red-400 font-display">Non-Negotiable Requirements</h3>
+              <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-400 border-red-500/30 font-bold uppercase">Must Have</Badge>
+            </div>
+            <ul className="space-y-2">
+              {jd.non_negotiables.map((item, i) => (
+                <li key={i} className="text-sm text-red-300/90 flex items-start gap-2">
+                  <span className="text-red-400 mt-1 shrink-0">⚠</span> {item}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
       </div>
     </div>
   );

@@ -21,6 +21,7 @@ export interface PositionJD {
   experience: string[];
   responsibilities: string[];
   skills: string[];
+  non_negotiables?: string[];
 }
 
 export interface PositionStats {
