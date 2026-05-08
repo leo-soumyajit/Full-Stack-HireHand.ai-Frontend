@@ -345,6 +345,9 @@ export function CandidatesTab({
     setAiConfigModal(null);
     try {
       const interviewType = aiConfig.interview_type === "custom" ? aiConfig.custom_type : aiConfig.interview_type;
+      // Convert the local datetime string to UTC ISO format for the backend
+      const utcScheduledAt = aiConfig.scheduled_at ? new Date(aiConfig.scheduled_at).toISOString() : "";
+
       await aiInterviewApi.dispatch({
         candidate_id: candidateId,
         position_id: positionId,
@@ -352,7 +355,7 @@ export function CandidatesTab({
         voice: aiConfig.voice,
         time_limit_minutes: aiConfig.time_limit_minutes,
         max_questions: aiConfig.max_questions,
-        scheduled_at: aiConfig.scheduled_at || "",
+        scheduled_at: utcScheduledAt,
         link_expiry_hours: aiConfig.link_expiry_hours,
         hr_notes: aiConfig.hr_notes,
       });
@@ -793,12 +796,15 @@ export function CandidatesTab({
                 <Clock className="h-3.5 w-3.5 text-cyan-400" />
                 Schedule Interview <span className="text-xs text-muted-foreground ml-1">(optional)</span>
               </Label>
-              <Input
-                type="datetime-local"
-                value={aiConfig.scheduled_at ? aiConfig.scheduled_at.slice(0, 16) : ""}
-                onChange={(e) => setAiConfig(prev => ({ ...prev, scheduled_at: e.target.value ? new Date(e.target.value).toISOString() : "" }))}
-                className="bg-muted/50 border-border/40"
-              />
+              <div className="relative">
+                <Input
+                  type="datetime-local"
+                  value={aiConfig.scheduled_at}
+                  onChange={(e) => setAiConfig(prev => ({ ...prev, scheduled_at: e.target.value }))}
+                  className="bg-muted/30 border-border/50 text-foreground shadow-sm focus:ring-2 focus:ring-cyan-500/30 transition-all pl-3 pr-10 py-5 w-full rounded-xl cursor-pointer hover:border-cyan-500/50"
+                  style={{ colorScheme: "dark" }}
+                />
+              </div>
               <p className="text-xs text-muted-foreground">Leave empty for immediate access</p>
             </div>
 
