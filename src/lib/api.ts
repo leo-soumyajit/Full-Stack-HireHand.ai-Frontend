@@ -104,6 +104,12 @@ export const positionsApi = {
       body: JSON.stringify({ status }),
     }),
 
+  setPublish: (id: string, is_published: boolean) =>
+    apiFetch<import('@/types/api').ApiPosition>(`/api/positions/${id}/publish`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_published }),
+    }),
+
   saveJD: (id: string, jd: object, version: number) =>
     apiFetch<import('@/types/api').ApiPosition>(`/api/positions/${id}/jd`, {
       method: 'PATCH',

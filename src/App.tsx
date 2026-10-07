@@ -16,6 +16,14 @@ import AIInterviewRoom from "./pages/AIInterviewRoom";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { SeekerProtectedRoute } from "@/components/SeekerProtectedRoute";
+import JobBoard from "./pages/seeker/JobBoard";
+import JobDetail from "./pages/seeker/JobDetail";
+import SeekerLogin from "./pages/seeker/SeekerLogin";
+import SeekerSignup from "./pages/seeker/SeekerSignup";
+import SeekerResetPassword from "./pages/seeker/SeekerResetPassword";
+import Onboarding from "./pages/seeker/Onboarding";
+import SeekerDashboard from "./pages/seeker/SeekerDashboard";
 import "@/styles/ai-interview.css";
 
 const queryClient = new QueryClient();
@@ -42,6 +50,15 @@ const App = () => (
                   </ProtectedRoute>
                 } 
               />
+              {/* ── Job Seeker Portal ── */}
+              <Route path="/jobs" element={<JobBoard />} />
+              <Route path="/jobs/:id" element={<JobDetail />} />
+              <Route path="/seeker/login" element={<SeekerLogin />} />
+              <Route path="/seeker/signup" element={<SeekerSignup />} />
+              <Route path="/seeker/reset-password" element={<SeekerResetPassword />} />
+              <Route path="/seeker/onboarding" element={<SeekerProtectedRoute><Onboarding /></SeekerProtectedRoute>} />
+              <Route path="/seeker/dashboard" element={<SeekerProtectedRoute><SeekerDashboard /></SeekerProtectedRoute>} />
+
               <Route path="/assessment/:token" element={<CandidateAssessment />} />
               <Route path="/interview/:roomId" element={<InterviewRoom />} />
               <Route path="/ai-interview/:token" element={<AIInterviewRoom />} />

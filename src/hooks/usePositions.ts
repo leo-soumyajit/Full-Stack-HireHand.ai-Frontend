@@ -20,6 +20,7 @@ interface UsePositionsReturn {
   updatePosition: (id: string, data: Partial<{ title: string; business_unit: string; location: string; level: string }>) => Promise<void>;
   deletePosition: (id: string) => Promise<void>;
   setPositionStatus: (id: string, status: 'Active' | 'Closed') => Promise<void>;
+  setPositionPublish: (id: string, isPublished: boolean) => Promise<void>;
   saveJD: (positionId: string, jd: ApiPositionJD, version: number) => Promise<void>;
   saveL1Questions: (positionId: string, questions: ApiL1Question[]) => Promise<void>;
   getCandidates: (positionId: string) => Promise<ApiCandidate[]>;
@@ -89,6 +90,17 @@ export function usePositions(): UsePositionsReturn {
     }
   }, [fetchPositions]);
 
+  const setPositionPublish = useCallback(async (id: string, isPublished: boolean) => {
+    setPositions(prev => prev.map(p => p.id === id ? { ...p, is_published: isPublished } : p));
+    try {
+      const updated = await positionsApi.setPublish(id, isPublished);
+      setPositions(prev => prev.map(p => p.id === id ? updated : p));
+    } catch (err) {
+      await fetchPositions();
+      throw err;
+    }
+  }, [fetchPositions]);
+
   const saveJD = useCallback(async (positionId: string, jd: ApiPositionJD, version: number) => {
     const updated = await positionsApi.saveJD(positionId, jd, version);
     setPositions(prev => prev.map(p => p.id === positionId ? updated : p));
@@ -135,6 +147,7 @@ export function usePositions(): UsePositionsReturn {
     updatePosition,
     deletePosition,
     setPositionStatus,
+    setPositionPublish,
     saveJD,
     saveL1Questions,
     getCandidates,

@@ -33,6 +33,7 @@ import {
   Trash2,
   Plus,
   Pencil,
+  Globe,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -88,7 +89,8 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
     return prev; 
   }, { replace: true });
 
-  const { positions, saveJD, saveL1Questions, addCandidate, deleteCandidate, getCandidates, isLoading, setCandidatesCount } = usePositions();
+  const { positions, saveJD, saveL1Questions, addCandidate, deleteCandidate, getCandidates, isLoading, setCandidatesCount, setPositionPublish } = usePositions();
+  const [publishing, setPublishing] = useState(false);
 
   // EOS-IA Psychometric state
   const [psychProfile, setPsychProfile] = useState<PsychometricProfile | null>(null);
@@ -188,6 +190,34 @@ export function PositionDetail({ positionId, onBack }: PositionDetailProps) {
           </div>
         </div>
         <div className="flex items-center gap-2 ml-12 sm:ml-0">
+          <Button
+            variant={position.is_published ? "default" : "outline"}
+            size="sm"
+            className={position.is_published ? "bg-emerald-600 hover:bg-emerald-600/90 text-white" : "border-border/50"}
+            disabled={publishing}
+            onClick={async () => {
+              if (!position.is_published && !position.jd) {
+                toast({ title: "Add a JD first", description: "Publish needs a saved job description.", variant: "destructive" });
+                setActiveTab("jd");
+                return;
+              }
+              setPublishing(true);
+              try {
+                await setPositionPublish(position.id, !position.is_published);
+                toast({
+                  title: position.is_published ? "Unpublished" : "Published to Job Board 🎉",
+                  description: position.is_published
+                    ? "This job is no longer visible to seekers."
+                    : "Seekers can now find and apply to this role.",
+                });
+              } catch (err) {
+                toast({ title: "Action failed", description: err instanceof Error ? err.message : "", variant: "destructive" });
+              } finally { setPublishing(false); }
+            }}
+          >
+            {publishing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Globe className="h-4 w-4 mr-1" />}
+            {position.is_published ? "Published" : "Publish"}
+          </Button>
           <Button variant="outline" size="sm" className="border-border/50">
             <Download className="h-4 w-4 mr-1" /> Board Pack
           </Button>

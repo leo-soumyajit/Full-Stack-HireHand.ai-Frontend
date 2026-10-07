@@ -55,6 +55,8 @@ export interface ApiPosition {
   shortlisted_count: number;
   risk_flag?: string | null;
   risk_level?: string | null;
+  is_published?: boolean;
+  published_at?: string | null;
   created_at: string;
   updated_at: string;
 }

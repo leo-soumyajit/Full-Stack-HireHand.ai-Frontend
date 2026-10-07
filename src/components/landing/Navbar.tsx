@@ -67,17 +67,28 @@ export function Navbar() {
           >
             Testimonials
           </a>
-          <a 
-            href="#how-it-works" 
+          <a
+            href="#how-it-works"
             className="relative text-sm text-muted-foreground transition-all duration-300 whitespace-nowrap hover:text-primary after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-primary after:transition-all after:duration-300 hover:after:w-full"
           >
             How It Works
           </a>
+          <Link
+            to="/jobs"
+            className="relative text-sm font-medium text-primary transition-all duration-300 whitespace-nowrap hover:opacity-80 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-primary after:transition-all after:duration-300 hover:after:w-full"
+          >
+            Find Jobs
+          </Link>
         </motion.div>
 
         {/* Right - Actions */}
         <div className="flex items-center gap-3 shrink-0">
           <ThemeToggle />
+          <Link to="/jobs" className="hidden sm:block">
+            <Button variant="ghost" className={`rounded-full whitespace-nowrap ${isScrolled ? "px-3 text-xs h-8" : "px-4 text-sm h-9"}`}>
+              Find Jobs
+            </Button>
+          </Link>
           <Link to="/login">
             <motion.div layout>
               <Button
