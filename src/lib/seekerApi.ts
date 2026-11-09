@@ -70,6 +70,23 @@ export interface Job {
   applicant_count: number;
 }
 
+export interface FactorScore {
+  score: number;
+  weight: number;
+  reason?: string | null;
+  days_ago?: number | null;
+  available?: boolean | null;
+}
+
+export interface MatchBreakdown {
+  skills: FactorScore;
+  semantic: FactorScore;
+  experience: FactorScore;
+  title: FactorScore;
+  location: FactorScore;
+  recency: FactorScore;
+}
+
 export interface Recommendation {
   job: Job;
   match_percent: number;
@@ -77,6 +94,21 @@ export interface Recommendation {
   missing_skills: string[];
   reason?: string | null;
   already_applied: boolean;
+  saved: boolean;
+  days_ago?: number | null;
+  breakdown?: MatchBreakdown | null;
+}
+
+export interface ProfileStrengthTip {
+  field: string;
+  label: string;
+  points: number;
+}
+
+export interface ProfileStrength {
+  percent: number;
+  tips: ProfileStrengthTip[];
+  missing: ProfileStrengthTip[];
 }
 
 export interface Application {
@@ -153,5 +185,26 @@ export const seekerApi = {
   myApplications: () => seekerFetch<Application[]>('/api/seeker/applications'),
 
   // recommendations
-  recommendations: () => seekerFetch<Recommendation[]>('/api/seeker/recommendations'),
+  recommendations: (params: { limit?: number; minScore?: number; includeSaved?: boolean } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.limit) qs.set('limit', String(params.limit));
+    if (params.minScore) qs.set('min_score', String(params.minScore));
+    if (params.includeSaved === false) qs.set('include_saved', 'false');
+    const q = qs.toString();
+    return seekerFetch<Recommendation[]>(`/api/seeker/recommendations${q ? `?${q}` : ''}`);
+  },
+  savedJobs: () => seekerFetch<Recommendation[]>('/api/seeker/saved-jobs'),
+  similarJobs: (jobId: string, limit = 6) =>
+    seekerFetch<Recommendation[]>(`/api/seeker/similar-jobs/${jobId}?limit=${limit}`),
+
+  // profile strength
+  profileStrength: () => seekerFetch<ProfileStrength>('/api/seeker/profile/strength'),
+
+  // save / dismiss
+  saveJob: (jobId: string): Promise<{ saved: boolean; job_id: string }> =>
+    seekerFetch(`/api/seeker/jobs/${jobId}/save`, { method: 'POST' }),
+  unsaveJob: (jobId: string): Promise<{ saved: boolean; job_id: string }> =>
+    seekerFetch(`/api/seeker/jobs/${jobId}/save`, { method: 'DELETE' }),
+  dismissJob: (jobId: string): Promise<{ dismissed: boolean; job_id: string }> =>
+    seekerFetch(`/api/seeker/jobs/${jobId}/dismiss`, { method: 'POST' }),
 };
