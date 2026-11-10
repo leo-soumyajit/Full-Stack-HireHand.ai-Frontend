@@ -1,0 +1,113 @@
+/*
+ * Job-Seeker scoped theme — Flat Design, sky/blue professional palette.
+ * Follows the "HireHand Jobs" design system (ui-ux-pro-max):
+ *   • Primary #0369A1 (sky-700) — LinkedIn/Naukri trust blue
+ *   • Accent  #16A34A (green-600) — success / "Applied"
+ *   • Background #F7FAFC — almost-white with a hint of cool
+ *   • Card  #FFFFFF — true white, subtle border
+ *   • Typography: Lexend (display) + Source Sans 3 (body)
+ *
+ * The .seeker-scope class overrides shadcn tokens for every element
+ * inside the seeker subtree, including in dark mode (`.dark .seeker-scope`),
+ * so the HR dashboard's theme stays exactly as the user configured it.
+ */
+
+.seeker-scope,
+.dark .seeker-scope {
+  /* Core (HSL triplets — shadcn expects these raw) */
+  --background: 210 40% 98%;          /* #F7FAFC */
+  --foreground: 215 28% 17%;          /* #1F2937 */
+  --card: 0 0% 100%;                  /* #FFFFFF */
+  --card-foreground: 215 28% 17%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 215 28% 17%;
+
+  --primary: 202 94% 32%;             /* #0369A1  (sky-700) */
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 199 89% 48%;           /* #0EA5E9  (sky-500) */
+  --secondary-foreground: 222 47% 11%;
+
+  --muted: 210 40% 96%;               /* #F1F5F9 */
+  --muted-foreground: 215 16% 47%;    /* #64748B */
+
+  --accent: 210 40% 96%;
+  --accent-foreground: 202 94% 32%;
+
+  --destructive: 0 72% 51%;           /* #DC2626 */
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 214 32% 91%;              /* #E2E8F0 */
+  --input: 214 32% 91%;
+  --ring: 202 94% 32%;
+
+  --radius: 0.75rem;
+
+  color-scheme: light;
+}
+
+/* Surface + typography inside the scope */
+.seeker-scope {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Source Sans 3', 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+}
+
+.seeker-scope h1,
+.seeker-scope h2,
+.seeker-scope h3,
+.seeker-scope .font-display {
+  font-family: 'Lexend', 'Plus Jakarta Sans', system-ui, sans-serif;
+  letter-spacing: -0.015em;
+}
+
+/* Flat Design — drop gradients + heavy shadows from the HR theme.
+   Keep ONE soft card shadow for depth, no colored glows. */
+.seeker-scope .gradient-primary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+.seeker-scope .glass-strong {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  backdrop-filter: none;
+}
+.seeker-scope .bg-dot-grid {
+  background-image: radial-gradient(hsl(var(--border)) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Pleasant default elevation for cards (keeps Flat but readable) */
+.seeker-scope .pro-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) + 2px);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+.seeker-scope .pro-card:hover {
+  border-color: hsl(var(--primary) / 0.35);
+  box-shadow: 0 8px 24px -12px hsl(var(--primary) / 0.18);
+}
+
+/* Soft brand chip used for "Applied / Match" tags */
+.seeker-scope .chip-brand {
+  background: hsl(var(--primary) / 0.08);
+  color: hsl(var(--primary));
+  border: 1px solid hsl(var(--primary) / 0.25);
+}
+
+/* Focus ring — WCAG-friendly */
+.seeker-scope :focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .seeker-scope * {
+    animation-duration: 0ms !important;
+    transition-duration: 0ms !important;
+  }
+}

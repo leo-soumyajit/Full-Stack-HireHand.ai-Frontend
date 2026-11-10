@@ -17,6 +17,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SeekerProtectedRoute } from "@/components/SeekerProtectedRoute";
+import { SeekerLayout } from "@/components/seeker/SeekerLayout";
 import JobBoard from "./pages/seeker/JobBoard";
 import JobDetail from "./pages/seeker/JobDetail";
 import SeekerLogin from "./pages/seeker/SeekerLogin";
@@ -24,6 +25,8 @@ import SeekerSignup from "./pages/seeker/SeekerSignup";
 import SeekerResetPassword from "./pages/seeker/SeekerResetPassword";
 import Onboarding from "./pages/seeker/Onboarding";
 import SeekerDashboard from "./pages/seeker/SeekerDashboard";
+
+const seek = (el: React.ReactNode) => <SeekerLayout>{el}</SeekerLayout>;
 import "@/styles/ai-interview.css";
 
 const queryClient = new QueryClient();
@@ -50,14 +53,14 @@ const App = () => (
                   </ProtectedRoute>
                 } 
               />
-              {/* ── Job Seeker Portal ── */}
-              <Route path="/jobs" element={<JobBoard />} />
-              <Route path="/jobs/:id" element={<JobDetail />} />
-              <Route path="/seeker/login" element={<SeekerLogin />} />
-              <Route path="/seeker/signup" element={<SeekerSignup />} />
-              <Route path="/seeker/reset-password" element={<SeekerResetPassword />} />
-              <Route path="/seeker/onboarding" element={<SeekerProtectedRoute><Onboarding /></SeekerProtectedRoute>} />
-              <Route path="/seeker/dashboard" element={<SeekerProtectedRoute><SeekerDashboard /></SeekerProtectedRoute>} />
+              {/* ── Job Seeker Portal (scoped light theme) ── */}
+              <Route path="/jobs" element={seek(<JobBoard />)} />
+              <Route path="/jobs/:id" element={seek(<JobDetail />)} />
+              <Route path="/seeker/login" element={seek(<SeekerLogin />)} />
+              <Route path="/seeker/signup" element={seek(<SeekerSignup />)} />
+              <Route path="/seeker/reset-password" element={seek(<SeekerResetPassword />)} />
+              <Route path="/seeker/onboarding" element={<SeekerProtectedRoute>{seek(<Onboarding />)}</SeekerProtectedRoute>} />
+              <Route path="/seeker/dashboard" element={<SeekerProtectedRoute>{seek(<SeekerDashboard />)}</SeekerProtectedRoute>} />
 
               <Route path="/assessment/:token" element={<CandidateAssessment />} />
               <Route path="/interview/:roomId" element={<InterviewRoom />} />
